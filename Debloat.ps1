@@ -767,19 +767,19 @@ if (-not (Test-AppInstalled "7-Zip")) {
 # NOTEPAD++
 # -------------------------
 
-# Force TLS 1.2 for GitHub downloads (prevents connection drops)
-[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-
 if (-not (Test-AppInstalled "Notepad++")) {
     Write-Info "Installing Notepad++ (silent)..."
-    $npInstaller = Join-Path $env:TEMP 'npp_installer.exe'
 
-    # Stable, always-working URL for latest 64-bit installer
+    $npInstaller = Join-Path $env:TEMP 'npp_installer.exe'
     $nppUrl = "https://github.com/notepad-plus-plus/notepad-plus-plus/releases/latest/download/npp.64-bit.Installer.exe"
 
     try {
-        Invoke-WebRequest -Uri $nppUrl -OutFile $npInstaller -UseBasicParsing -ErrorAction Stop
-        if (-not (Test-Path -Path $npInstaller)) { throw "Download failed: $npInstaller not found." }
+        $headers = @{
+            "User-Agent" = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+        }
+
+        Invoke-WebRequest -Uri $nppUrl -OutFile $npInstaller -Headers $headers -ErrorAction Stop
+
         Start-Process -FilePath $npInstaller -ArgumentList "/S" -Wait -ErrorAction Stop
         Write-OK "Notepad++ installed."
     } catch {
@@ -796,13 +796,16 @@ if (-not (Test-AppInstalled "Notepad++")) {
 if (-not (Test-AppInstalled "Discord")) {
     Write-Info "Installing Discord (silent)..."
 
-    # Download to a safe location (TEMP sometimes causes permission issues)
-    $discordInstaller = "$env:USERPROFILE\Downloads\discord_installer.exe"
-    $discordUrl = "https://discord.com/api/download?platform=win&format=exe"
+    $discordInstaller = Join-Path $env:TEMP 'discord_installer.exe'
+    $discordUrl = "https://dl.discordapp.net/distro/app/stable/win/x86/1.0.9152/DiscordSetup.exe"
 
     try {
-        Invoke-WebRequest -Uri $discordUrl -OutFile $discordInstaller -UseBasicParsing -ErrorAction Stop
-        if (-not (Test-Path -Path $discordInstaller)) { throw "Download failed: $discordInstaller not found." }
+        $headers = @{
+            "User-Agent" = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+        }
+
+        Invoke-WebRequest -Uri $discordUrl -OutFile $discordInstaller -Headers $headers -ErrorAction Stop
+
         Start-Process -FilePath $discordInstaller -ArgumentList "/S" -Wait -ErrorAction Stop
         Write-OK "Discord installed."
     } catch {
@@ -903,5 +906,6 @@ Write-Host ""
 
 Start-Sleep -Seconds $rebootDelay
 shutdown /r /t 0
+
 
 
