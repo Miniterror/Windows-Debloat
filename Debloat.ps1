@@ -1,10 +1,3 @@
-# ============================================================================
-# FULL SUPERDEBLOAT / HARDENING SCRIPT
-# ============================================================================
-# Vereist: Administrator
-# Doel: Debloat, privacy-hardening, anti-cloud, UI-cleanup, Edge/OneDrive/Teams/Clipchamp removals
-# ============================================================================
-
 # 0. ADMIN CHECK, LOGGING, HELPERS
 # ============================================================================
 
@@ -14,6 +7,9 @@ $IsAdmin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIde
 
 if (-not $IsAdmin) {
     Write-Host "[ERROR] Run this script as Administrator." -ForegroundColor Red
+    Write-Host ""
+    Write-Host "This window will close in 10 seconds..." -ForegroundColor Yellow
+    Start-Sleep -Seconds 10
     exit 1
 }
 
@@ -98,7 +94,6 @@ $allAppxSelectors = @(
 
 Remove-AppPackagesSelectors -Selectors $allAppxSelectors
 
-
 # 3. WINDOWS CAPABILITIES & OPTIONAL FEATURES
 # ============================================================================
 
@@ -137,7 +132,6 @@ foreach ($selector in $features) {
             Disable-WindowsOptionalFeature -Online -FeatureName $_.FeatureName -Remove -NoRestart -ErrorAction Continue
         }
 }
-
 
 # 4. PRIVACY, TELEMETRY, DIAGNOSTICS, CONTENT DELIVERY
 # ============================================================================
@@ -437,85 +431,13 @@ reg add "HKLM\SYSTEM\CurrentControlSet\Control" /v SvcHostSplitThresholdInKB /t 
 # 8. LOCALE, TIMEZONE, LANGUAGE
 # ============================================================================
 
-Write-Info "Windows Region & Language Configuration"
+Write-Info "Setting locale/timezone to NL / W. Europe..."
 
-# -------------------------
-# Helper: Menu Selection
-# -------------------------
-function Show-Menu {
-    param(
-        [string]$Title,
-        [array]$Options
-    )
-
-    Write-Host ""
-    Write-Host "=== $Title ==="
-    for ($i = 0; $i -lt $Options.Count; $i++) {
-        Write-Host "[$($i+1)] $($Options[$i])"
-    }
-
-    do {
-        $choice = Read-Host "Choose an option (1-$($Options.Count))"
-    } until ($choice -match "^[1-$($Options.Count)]$")
-
-    return $Options[$choice - 1]
-}
-
-# -------------------------
-# TIMEZONE SELECTION
-# -------------------------
-
-$timezones = @(
-    "W. Europe Standard Time (NL, BE, DE, FR)",
-    "GMT Standard Time (UK, IE)",
-    "Romance Standard Time (FR, ES)",
-    "Pacific Standard Time (US West Coast)",
-    "Eastern Standard Time (US East Coast)"
-)
-
-$tzChoice = Show-Menu "Select your Timezone" $timezones
-
-switch -Wildcard ($tzChoice) {
-    "*W. Europe*" { $tz = "W. Europe Standard Time" }
-    "*GMT*"       { $tz = "GMT Standard Time" }
-    "*Romance*"   { $tz = "Romance Standard Time" }
-    "*Pacific*"   { $tz = "Pacific Standard Time" }
-    "*Eastern*"   { $tz = "Eastern Standard Time" }
-}
-
-Write-Info "Setting timezone to $tz..."
-tzutil /s "$tz"
-
-# -------------------------
-# LANGUAGE / LOCALE SELECTION
-# -------------------------
-
-$languages = @(
-    "Dutch (nl-NL)",
-    "English US (en-US)",
-    "English UK (en-GB)",
-    "German (de-DE)",
-    "French (fr-FR)"
-)
-
-$langChoice = Show-Menu "Select your Language & Locale" $languages
-
-switch -Wildcard ($langChoice) {
-    "*Dutch*"   { $lang = "nl-NL"; $geo = 176 }
-    "*US*"      { $lang = "en-US"; $geo = 244 }
-    "*UK*"      { $lang = "en-GB"; $geo = 242 }
-    "*German*"  { $lang = "de-DE"; $geo = 94 }
-    "*French*"  { $lang = "fr-FR"; $geo = 84 }
-}
-
-Write-Info "Applying language/locale: $lang"
-
-Set-WinSystemLocale $lang
-Set-WinUserLanguageList $lang -Force
-Set-Culture $lang
-Set-WinHomeLocation -GeoId $geo
-
-Write-OK "Locale, language, and timezone configuration complete."
+tzutil /s "W. Europe Standard Time"
+Set-WinSystemLocale nl-NL
+Set-WinUserLanguageList nl-NL -Force
+Set-Culture nl-NL
+Set-WinHomeLocation -GeoId 176  # Nederland
 
 
 # 9. THEME / ACCENT COLOR
@@ -695,28 +617,7 @@ reg delete "HKCU\Software\Microsoft\Windows\CurrentVersion\Run" /v OneDrive /f 2
 # (optioneel) OneDrive uit de Explorer navigatieboom
 reg add "HKCR\CLSID\{018D5C66-4533-4307-9B53-224DE2ED1FE6}" /v System.IsPinnedToNameSpaceTree /t REG_DWORD /d 0 /f 2>$null
 
-# 14. REMOVE GET STARTED (CLIENT.CBS)
-# ============================================================================
-
-Write-Info "Removing Get Started (Client.CBS & Client.Core)..."
-
-$clientApps = @(
-    "C:\Windows\SystemApps\MicrosoftWindows.Client.CBS_cw5n1h2txyewy",
-    "C:\Windows\SystemApps\MicrosoftWindows.Client.Core_cw5n1h2txyewy"
-)
-
-foreach ($app in $clientApps) {
-    if (Test-Path $app) {
-        takeown /F $app /R /D Y | Out-Null
-        icacls $app /grant administrators:F /T | Out-Null
-        Remove-Item $app -Recurse -Force -ErrorAction SilentlyContinue
-        Write-Remove "Removed: $app"
-    } else {
-        Write-Info "Not found: $app"
-    }
-}
-
-# 15. EXTENDED PRIVACY / ANTI-AD / ANTI-CLOUD / ANTI-SPOTLIGHT / ANTI-RECALL
+# 14. EXTENDED PRIVACY / ANTI-AD / ANTI-CLOUD / ANTI-SPOTLIGHT / ANTI-RECALL
 # ============================================================================
 
 Write-Info "Applying extended privacy and anti-advertising hardening..."
@@ -770,127 +671,234 @@ reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager" 
 reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager" /v PreInstalledAppsEnabled /t REG_DWORD /d 0 /f > $null
 reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager" /v PreInstalledAppsEverEnabled /t REG_DWORD /d 0 /f > $null
 
+# Disable Get Started / Privacy Experience
+reg add "HKLM\Software\Policies\Microsoft\Windows\OOBE" /v DisablePrivacyExperience /t REG_DWORD /d 1 /f > $null
+
+# Suggested apps in Start (25H2)
+reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" /v Start_IrisRecommendations /t REG_DWORD /d 0 /f > $null
+
 Write-OK "Extended privacy and anti-advertising hardening applied."
 
-# 16. APPLICATION INSTALLATION (Chrome, 7-Zip, Notepad++) + DEFAULT BROWSER
+# 15. APPLICATION INSTALLATION (Chrome, 7-Zip, Notepad++, Discord, Steam)
 # ============================================================================
+
+function Write-Info { param($m) Write-Host "[INFO]  $m" -ForegroundColor Cyan }
+function Write-OK   { param($m) Write-Host "[OK]    $m" -ForegroundColor Green }
+function Write-Warn { param($m) Write-Host "[WARN]  $m" -ForegroundColor Yellow }
+function Write-Err  { param($m) Write-Host "[ERROR] $m" -ForegroundColor Red }
 
 Write-Info "Checking required applications..."
 
+# -------------------------
+# INSTALL TOGGLES
+# -------------------------
+$InstallChrome   = $true
+$Install7Zip     = $true
+$InstallNPP      = $true
+$InstallDiscord  = $true
+$InstallSteam    = $true
+
+# -------------------------
 # Helper: Check if an app exists in uninstall registry
+# -------------------------
 function Test-AppInstalled {
     param([string]$Name)
 
     $paths = @(
-        "HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall",
-        "HKLM:\Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall"
+        "HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*",
+        "HKLM:\Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*",
+        "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*"
     )
 
     foreach ($path in $paths) {
-        $items = Get-ChildItem $path -ErrorAction SilentlyContinue
-        foreach ($item in $items) {
-            if ($item.GetValue("DisplayName") -like "*$Name*") {
-                return $true
-            }
-        }
+        try {
+            Get-ItemProperty -Path $path -ErrorAction SilentlyContinue |
+                ForEach-Object {
+                    if ($_.DisplayName -and ($_.DisplayName -like "*$Name*")) {
+                        return $true
+                    }
+                }
+        } catch {}
     }
-    return $false
-}
-
-# Helper: Yes/No prompt
-function Ask-YesNo {
-    param([string]$Message)
-    $answer = Read-Host "$Message (Y/N, default = Y)"
-    if ($answer -eq "" -or $answer -match "^[Yy]") { return $true }
     return $false
 }
 
 # -------------------------
 # GOOGLE CHROME
 # -------------------------
-
-if (Ask-YesNo "Install Google Chrome") {
-
+if ($InstallChrome) {
     $chromeInstalled = Test-AppInstalled "Google Chrome"
 
     if (-not $chromeInstalled) {
         Write-Info "Installing Google Chrome (silent)..."
-        $chromeInstaller = "$env:TEMP\chrome_installer.exe"
-        Invoke-WebRequest "https://dl.google.com/chrome/install/latest/chrome_installer.exe" -OutFile $chromeInstaller -UseBasicParsing
-        Start-Process $chromeInstaller -ArgumentList "/silent /install" -Wait
-        Write-OK "Google Chrome installed."
+        $chromeInstaller = Join-Path $env:TEMP 'chrome_installer.exe'
+        try {
+            Invoke-WebRequest -Uri "https://dl.google.com/chrome/install/latest/chrome_installer.exe" -OutFile $chromeInstaller -UseBasicParsing -ErrorAction Stop
+            Start-Process -FilePath $chromeInstaller -ArgumentList "/silent","/install" -Wait -ErrorAction Stop
+            Write-OK "Google Chrome installed."
+
+            # Set Chrome as default ONLY if installed now
+            Write-Info "Setting Chrome as default browser..."
+            $chromeExe = Join-Path $env:ProgramFiles 'Google\Chrome\Application\chrome.exe'
+            if (Test-Path $chromeExe) {
+                Start-Process -FilePath $chromeExe -ArgumentList '--make-default-browser'
+                Write-OK "Chrome set as default browser."
+            }
+        } catch {
+            Write-Err "Failed to install Google Chrome: $($_.Exception.Message)"
+        }
     } else {
-        Write-Info "Google Chrome already installed — skipping installation."
+        Write-Info "Google Chrome already installed — skipping."
     }
-
-    if (Ask-YesNo "Set Google Chrome as default browser") {
-        Write-Info "Setting Chrome as default browser..."
-        Start-Process "$env:ProgramFiles\Google\Chrome\Application\chrome.exe" --make-default-browser
-        Write-OK "Chrome set as default browser."
-    }
-
 } else {
-    Write-Info "Skipping Google Chrome installation."
+    Write-Info "Chrome installation disabled by toggle."
 }
 
 # -------------------------
 # 7-ZIP
 # -------------------------
-
-if (Ask-YesNo "Install 7-Zip") {
-
+if ($Install7Zip) {
     if (-not (Test-AppInstalled "7-Zip")) {
         Write-Info "Installing 7-Zip (silent)..."
-        $zipInstaller = "$env:TEMP\7zip_installer.exe"
-        Invoke-WebRequest "https://www.7-zip.org/a/7z2408-x64.exe" -OutFile $zipInstaller -UseBasicParsing
-        Start-Process $zipInstaller -ArgumentList "/S" -Wait
-        Write-OK "7-Zip installed."
+        $zipInstaller = Join-Path $env:TEMP '7zip_installer.exe'
+        try {
+            Invoke-WebRequest -Uri "https://www.7-zip.org/a/7z2408-x64.exe" -OutFile $zipInstaller -UseBasicParsing -ErrorAction Stop
+            Start-Process -FilePath $zipInstaller -ArgumentList "/S" -Wait -ErrorAction Stop
+            Write-OK "7-Zip installed."
+        } catch {
+            Write-Err "Failed to install 7-Zip: $($_.Exception.Message)"
+        }
     } else {
         Write-Info "7-Zip already installed — skipping."
     }
-
 } else {
-    Write-Info "Skipping 7-Zip installation."
+    Write-Info "7-Zip installation disabled by toggle."
 }
 
 # -------------------------
 # NOTEPAD++
 # -------------------------
-
-if (Ask-YesNo "Install Notepad++") {
-
+if ($InstallNPP) {
     if (-not (Test-AppInstalled "Notepad++")) {
         Write-Info "Installing Notepad++ (silent)..."
-        $npInstaller = "$env:TEMP\npp_installer.exe"
-        Invoke-WebRequest "https://github.com/notepad-plus-plus/notepad-plus-plus/releases/latest/download/npp.8.6.7.Installer.x64.exe" -OutFile $npInstaller -UseBasicParsing
-        Start-Process $npInstaller -ArgumentList "/S" -Wait
-        Write-OK "Notepad++ installed."
+        $npInstaller = Join-Path $env:TEMP 'npp_installer.exe'
+        $nppUrl = "https://github.com/notepad-plus-plus/notepad-plus-plus/releases/latest/download/npp.Installer.x64.exe"
+
+        try {
+            Invoke-WebRequest -Uri $nppUrl -OutFile $npInstaller -UseBasicParsing -ErrorAction Stop
+            Start-Process -FilePath $npInstaller -ArgumentList "/S" -Wait -ErrorAction Stop
+            Write-OK "Notepad++ installed."
+        } catch {
+            Write-Err "Failed to install Notepad++: $($_.Exception.Message)"
+        }
     } else {
         Write-Info "Notepad++ already installed — skipping."
     }
-
 } else {
-    Write-Info "Skipping Notepad++ installation."
+    Write-Info "Notepad++ installation disabled by toggle."
+}
+
+# -------------------------
+# DISCORD
+# -------------------------
+if ($InstallDiscord) {
+    if (-not (Test-AppInstalled "Discord")) {
+        Write-Info "Installing Discord (silent)..."
+        $discordInstaller = Join-Path $env:TEMP 'discord_installer.exe'
+        $discordUrl = "https://discord.com/api/download?platform=win&format=exe"
+
+        try {
+            Invoke-WebRequest -Uri $discordUrl -OutFile $discordInstaller -UseBasicParsing -ErrorAction Stop
+            Start-Process -FilePath $discordInstaller -ArgumentList "/S" -Wait -ErrorAction Stop
+            Write-OK "Discord installed."
+        } catch {
+            Write-Err "Failed to install Discord: $($_.Exception.Message)"
+        }
+    } else {
+        Write-Info "Discord already installed — skipping."
+    }
+} else {
+    Write-Info "Discord installation disabled by toggle."
+}
+
+# -------------------------
+# STEAM
+# -------------------------
+if ($InstallSteam) {
+    if (-not (Test-AppInstalled "Steam")) {
+        Write-Info "Installing Steam (silent)..."
+        $steamInstaller = Join-Path $env:TEMP 'steam_installer.exe'
+        $steamUrl = "https://cdn.cloudflare.steamstatic.com/client/installer/SteamSetup.exe"
+
+        try {
+            Invoke-WebRequest -Uri $steamUrl -OutFile $steamInstaller -UseBasicParsing -ErrorAction Stop
+            Start-Process -FilePath $steamInstaller -ArgumentList "/S" -Wait -ErrorAction Stop
+            Write-OK "Steam installed."
+        } catch {
+            Write-Err "Failed to install Steam: $($_.Exception.Message)"
+        }
+    } else {
+        Write-Info "Steam already installed — skipping."
+    }
+} else {
+    Write-Info "Steam installation disabled by toggle."
 }
 
 Write-OK "Application installation and configuration complete."
 
-# 17. TASKBAR CACHE CLEANUP + EXPLORER RESTART
-# ============================================================================
 
-Write-Info "Cleaning taskbar cache..."
+# 16. TASKBAR CACHE CLEANUP + EXPLORER RESTART
+# ============================================================================
+Write-Host "Cleaning taskbar cache..."
 
 $taskbarCache = Join-Path $env:LOCALAPPDATA "Microsoft\Windows\Explorer"
-Get-ChildItem $taskbarCache -Filter "taskbar*.db" -ErrorAction SilentlyContinue |
-    Remove-Item -Force -ErrorAction SilentlyContinue
 
-Write-Info "Restarting Explorer..."
-Get-Process -Name 'explorer' -ErrorAction SilentlyContinue | Stop-Process -Force
+try {
+    # Stop explorer if running
+    $expl = Get-Process -Name explorer -ErrorAction SilentlyContinue
+    if ($expl) {
+        Write-Host "Stopping Explorer..."
+        $expl | Stop-Process -Force -ErrorAction Stop
 
-Write-OK "Explorer restarted."
+        # Wait for explorer to exit (timeout in seconds)
+        $timeout = 10
+        $sw = [Diagnostics.Stopwatch]::StartNew()
+        while ((Get-Process -Name explorer -ErrorAction SilentlyContinue) -ne $null -and $sw.Elapsed.TotalSeconds -lt $timeout) {
+            Start-Sleep -Milliseconds 250
+        }
+    }
 
+    # Remove taskbar cache files if folder exists
+    if (Test-Path -Path $taskbarCache) {
+        Write-Host "Removing taskbar cache files from $taskbarCache"
+        Get-ChildItem -Path $taskbarCache -Filter "taskbar*.db" -File -ErrorAction SilentlyContinue |
+            ForEach-Object {
+                try {
+                    Remove-Item -LiteralPath $_.FullName -Force -ErrorAction Stop
+                    Write-Host "Removed $($_.Name)"
+                } catch {
+                    Write-Warning "Could not remove $($_.Name): $($_.Exception.Message)"
+                }
+            }
+    } else {
+        Write-Host "Taskbar cache folder not found: $taskbarCache"
+    }
 
-# 18. AUTOMATIC REBOOT WITH BANNER
+    # Start Explorer and verify
+    Write-Host "Starting Explorer..."
+    Start-Process -FilePath "explorer.exe"
+    Start-Sleep -Seconds 2
+
+    if (Get-Process -Name explorer -ErrorAction SilentlyContinue) {
+        Write-Host "Explorer restarted successfully."
+    } else {
+        Write-Error "Explorer did not start. Check shell registry and user context."
+    }
+} catch {
+    Write-Error "Taskbar cleanup failed: $($_.Exception.Message)"
+}
+
+# 17. AUTOMATIC REBOOT WITH BANNER
 # ============================================================================
 
 $rebootDelay = 15
@@ -908,10 +916,3 @@ Write-Host ""
 
 Start-Sleep -Seconds $rebootDelay
 shutdown /r /t 0
-
-
-
-
-
-
-
