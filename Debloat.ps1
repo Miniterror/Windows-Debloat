@@ -345,6 +345,14 @@ if (Test-Path $taskbarPins) {
     Get-ChildItem $taskbarPins | Remove-Item -Force -ErrorAction SilentlyContinue
 }
 
+# File Explorer opnieuw pinnen
+$explorerPath = "C:\Windows\explorer.exe"
+$verb = "taskbarpin"
+
+$shell = New-Object -ComObject Shell.Application
+$item = $shell.Namespace((Split-Path $explorerPath)).ParseName((Split-Path $explorerPath -Leaf))
+$item.InvokeVerb($verb)
+
 # Repinning task uitschakelen
 schtasks /Change /TN "Microsoft\Windows\Shell\TaskbarLayoutModification" /Disable 2>$null
 
@@ -353,6 +361,10 @@ Write-Info "Clearing Start menu pins..."
 $keyStartPolicy = 'Registry::HKLM\SOFTWARE\Microsoft\PolicyManager\current\device\Start'
 New-Item -Path $keyStartPolicy -ItemType Directory -ErrorAction SilentlyContinue | Out-Null
 Set-ItemProperty -LiteralPath $keyStartPolicy -Name 'ConfigureStartPins' -Value '{"pinnedList":[]}' -Type String
+
+# LinkedIn AppX volledig verwijderen (fallback)
+Get-AppxPackage -AllUsers *LinkedIn* | Remove-AppxPackage -AllUsers -ErrorAction SilentlyContinue
+Get-AppxProvisionedPackage -Online | Where-Object {$_.PackageName -like "*LinkedIn*"} | Remove-AppxProvisionedPackage -Online -ErrorAction SilentlyContinue
 
 # Layout XML's (LinkedIn + Store pin)
 Write-Info "Cleaning default Start layout (LinkedIn/Store pins)..."
@@ -611,23 +623,26 @@ reg delete "HKCU\Software\Microsoft\Windows\CurrentVersion\Run" /v OneDrive /f 2
 # (optioneel) OneDrive uit de Explorer navigatieboom
 reg add "HKCR\CLSID\{018D5C66-4533-4307-9B53-224DE2ED1FE6}" /v System.IsPinnedToNameSpaceTree /t REG_DWORD /d 0 /f 2>$null
 
-
 # 14. REMOVE GET STARTED (CLIENT.CBS)
 # ============================================================================
 
-Write-Info "Removing Get Started (Client.CBS)..."
+Write-Info "Removing Get Started (Client.CBS & Client.Core)..."
 
-$gs = "C:\Windows\SystemApps\MicrosoftWindows.Client.CBS_cw5n1h2txyewy"
+$clientApps = @(
+    "C:\Windows\SystemApps\MicrosoftWindows.Client.CBS_cw5n1h2txyewy",
+    "C:\Windows\SystemApps\MicrosoftWindows.Client.Core_cw5n1h2txyewy"
+)
 
-if (Test-Path $gs) {
-    takeown /F $gs /R /D Y | Out-Null
-    icacls $gs /grant administrators:F /T | Out-Null
-    Remove-Item $gs -Recurse -Force -ErrorAction SilentlyContinue
-    Write-Remove "Removed: MicrosoftWindows.Client.CBS"
-} else {
-    Write-Info "Get Started folder not found — maybe already removed."
+foreach ($app in $clientApps) {
+    if (Test-Path $app) {
+        takeown /F $app /R /D Y | Out-Null
+        icacls $app /grant administrators:F /T | Out-Null
+        Remove-Item $app -Recurse -Force -ErrorAction SilentlyContinue
+        Write-Remove "Removed: $app"
+    } else {
+        Write-Info "Not found: $app"
+    }
 }
-
 
 # 15. EXTENDED PRIVACY / ANTI-AD / ANTI-CLOUD / ANTI-SPOTLIGHT / ANTI-RECALL
 # ============================================================================
@@ -685,8 +700,111 @@ reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager" 
 
 Write-OK "Extended privacy and anti-advertising hardening applied."
 
+# 16. APPLICATION INSTALLATION (Chrome, 7-Zip, Notepad++) + DEFAULT BROWSER + TASKBAR PIN
+# ============================================================================
 
-# 16. TASKBAR CACHE CLEANUP + EXPLORER RESTART
+Write-Info "Checking required applications..."
+
+# Helper: Check if an app exists in uninstall registry
+function Test-AppInstalled {
+    param([string]$Name)
+
+    $paths = @(
+        "HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall",
+        "HKLM:\Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall"
+    )
+
+    foreach ($path in $paths) {
+        $items = Get-ChildItem $path -ErrorAction SilentlyContinue
+        foreach ($item in $items) {
+            if ($item.GetValue("DisplayName") -like "*$Name*") {
+                return $true
+            }
+        }
+    }
+    return $false
+}
+
+# -------------------------
+# GOOGLE CHROME
+# -------------------------
+
+$chromeInstalled = Test-AppInstalled "Google Chrome"
+
+if (-not $chromeInstalled) {
+    Write-Info "Installing Google Chrome (silent)..."
+    $chromeInstaller = "$env:TEMP\chrome_installer.exe"
+    Invoke-WebRequest "https://dl.google.com/chrome/install/latest/chrome_installer.exe" -OutFile $chromeInstaller -UseBasicParsing
+    Start-Process $chromeInstaller -ArgumentList "/silent /install" -Wait
+    Write-OK "Google Chrome installed."
+} else {
+    Write-Info "Google Chrome already installed — skipping installation."
+}
+
+# Set Chrome as default browser
+Write-Info "Setting Chrome as default browser..."
+
+$xml = @"
+<?xml version="1.0" encoding="UTF-8"?>
+<DefaultAssociations>
+    <Association Identifier=".htm" ProgId="ChromeHTML" ApplicationName="Google Chrome" />
+    <Association Identifier=".html" ProgId="ChromeHTML" ApplicationName="Google Chrome" />
+    <Association Identifier="http" ProgId="ChromeHTML" ApplicationName="Google Chrome" />
+    <Association Identifier="https" ProgId="ChromeHTML" ApplicationName="Google Chrome" />
+</DefaultAssociations>
+"@
+
+$xmlPath = "$env:TEMP\chrome-defaults.xml"
+$xml | Out-File -FilePath $xmlPath -Encoding ASCII
+
+Dism.exe /Online /Import-DefaultAppAssociations:$xmlPath | Out-Null
+
+Write-OK "Chrome set as default browser."
+
+# Pin Chrome to taskbar
+Write-Info "Pinning Google Chrome to taskbar..."
+
+$chromePath = "C:\Program Files\Google\Chrome\Application\chrome.exe"
+if (Test-Path $chromePath) {
+    $shell = New-Object -ComObject Shell.Application
+    $item = $shell.Namespace((Split-Path $chromePath)).ParseName((Split-Path $chromePath -Leaf))
+    $item.InvokeVerb("taskbarpin")
+    Write-OK "Chrome pinned to taskbar."
+} else {
+    Write-Info "Chrome executable not found — skipping taskbar pin."
+}
+
+# -------------------------
+# 7-ZIP
+# -------------------------
+
+if (-not (Test-AppInstalled "7-Zip")) {
+    Write-Info "Installing 7-Zip (silent)..."
+    $zipInstaller = "$env:TEMP\7zip_installer.exe"
+    Invoke-WebRequest "https://www.7-zip.org/a/7z2408-x64.exe" -OutFile $zipInstaller -UseBasicParsing
+    Start-Process $zipInstaller -ArgumentList "/S" -Wait
+    Write-OK "7-Zip installed."
+} else {
+    Write-Info "7-Zip already installed — skipping."
+}
+
+# -------------------------
+# NOTEPAD++
+# -------------------------
+
+if (-not (Test-AppInstalled "Notepad++")) {
+    Write-Info "Installing Notepad++ (silent)..."
+    $npInstaller = "$env:TEMP\npp_installer.exe"
+    Invoke-WebRequest "https://github.com/notepad-plus-plus/notepad-plus-plus/releases/latest/download/npp.8.6.7.Installer.x64.exe" -OutFile $npInstaller -UseBasicParsing
+    Start-Process $npInstaller -ArgumentList "/S" -Wait
+    Write-OK "Notepad++ installed."
+} else {
+    Write-Info "Notepad++ already installed — skipping."
+}
+
+Write-OK "Application installation and configuration complete."
+
+# 17. TASKBAR CACHE CLEANUP + EXPLORER RESTART
 # ============================================================================
 
 Write-Info "Cleaning taskbar cache..."
@@ -701,7 +819,7 @@ Get-Process -Name 'explorer' -ErrorAction SilentlyContinue | Stop-Process -Force
 Write-OK "Explorer restarted."
 
 
-# 17. AUTOMATIC REBOOT WITH BANNER
+# 18. AUTOMATIC REBOOT WITH BANNER
 # ============================================================================
 
 $rebootDelay = 15
@@ -719,6 +837,7 @@ Write-Host ""
 
 Start-Sleep -Seconds $rebootDelay
 shutdown /r /t 0
+
 
 
 
