@@ -3,7 +3,6 @@
 # ============================================================================
 # Vereist: Administrator
 # Doel: Debloat, privacy-hardening, anti-cloud, UI-cleanup, Edge/OneDrive/Teams/Clipchamp removals
-# Taal/land: NL / W. Europe
 # ============================================================================
 
 # 0. ADMIN CHECK, LOGGING, HELPERS
@@ -628,4 +627,5 @@ Write-Host ""
 
 Start-Sleep -Seconds $rebootDelay
 shutdown /r /t 0
+
 
