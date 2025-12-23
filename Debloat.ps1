@@ -1,10 +1,3 @@
-# ============================================================================
-# FULL SUPERDEBLOAT / HARDENING SCRIPT
-# ============================================================================
-# Vereist: Administrator
-# Doel: Debloat, privacy-hardening, anti-cloud, UI-cleanup, Edge/OneDrive/Teams/Clipchamp removals
-# ============================================================================
-
 # 0. ADMIN CHECK, LOGGING, HELPERS
 # ============================================================================
 
@@ -700,95 +693,51 @@ reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager" 
 
 Write-OK "Extended privacy and anti-advertising hardening applied."
 
-# 16. APPLICATION INSTALLATION (Chrome, 7-Zip, Notepad++) + DEFAULT BROWSER
-# ============================================================================
-
-Write-Info "Checking required applications..."
-
-# Helper: Check if an app exists in uninstall registry
-function Test-AppInstalled {
-    param([string]$Name)
-
-    $paths = @(
-        "HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall",
-        "HKLM:\Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall"
-    )
-
-    foreach ($path in $paths) {
-        $items = Get-ChildItem $path -ErrorAction SilentlyContinue
-        foreach ($item in $items) {
-            if ($item.GetValue("DisplayName") -like "*$Name*") {
-                return $true
-            }
-        }
-    }
-    return $false
-}
-
-# -------------------------
-# GOOGLE CHROME
-# -------------------------
-
-$chromeInstalled = Test-AppInstalled "Google Chrome"
-
-if (-not $chromeInstalled) {
-    Write-Info "Installing Google Chrome (silent)..."
-    $chromeInstaller = "$env:TEMP\chrome_installer.exe"
-    Invoke-WebRequest "https://dl.google.com/chrome/install/latest/chrome_installer.exe" -OutFile $chromeInstaller -UseBasicParsing
-    Start-Process $chromeInstaller -ArgumentList "/silent /install" -Wait
-    Write-OK "Google Chrome installed."
-} else {
-    Write-Info "Google Chrome already installed — skipping installation."
-}
-
-# Set Chrome as default browser (current user)
-Write-Info "Setting Chrome as default browser..."
-Start-Process "$env:ProgramFiles\Google\Chrome\Application\chrome.exe" --make-default-browser
-Write-OK "Chrome set as default browser."
-
-# -------------------------
-# 7-ZIP
-# -------------------------
-
-if (-not (Test-AppInstalled "7-Zip")) {
-    Write-Info "Installing 7-Zip (silent)..."
-    $zipInstaller = "$env:TEMP\7zip_installer.exe"
-    Invoke-WebRequest "https://www.7-zip.org/a/7z2408-x64.exe" -OutFile $zipInstaller -UseBasicParsing
-    Start-Process $zipInstaller -ArgumentList "/S" -Wait
-    Write-OK "7-Zip installed."
-} else {
-    Write-Info "7-Zip already installed — skipping."
-}
-
-# -------------------------
-# NOTEPAD++
-# -------------------------
-
-if (-not (Test-AppInstalled "Notepad++")) {
-    Write-Info "Installing Notepad++ (silent)..."
-    $npInstaller = "$env:TEMP\npp_installer.exe"
-    Invoke-WebRequest "https://github.com/notepad-plus-plus/notepad-plus-plus/releases/latest/download/npp.8.6.7.Installer.x64.exe" -OutFile $npInstaller -UseBasicParsing
-    Start-Process $npInstaller -ArgumentList "/S" -Wait
-    Write-OK "Notepad++ installed."
-} else {
-    Write-Info "Notepad++ already installed — skipping."
-}
-
-Write-OK "Application installation and configuration complete."
-
 # 17. TASKBAR CACHE CLEANUP + EXPLORER RESTART
 # ============================================================================
-
 Write-Info "Cleaning taskbar cache..."
 
 $taskbarCache = Join-Path $env:LOCALAPPDATA "Microsoft\Windows\Explorer"
-Get-ChildItem $taskbarCache -Filter "taskbar*.db" -ErrorAction SilentlyContinue |
-    Remove-Item -Force -ErrorAction SilentlyContinue
 
-Write-Info "Restarting Explorer..."
-Get-Process -Name 'explorer' -ErrorAction SilentlyContinue | Stop-Process -Force
+try {
+    # Stop explorer gracefully, then force if needed
+    $expl = Get-Process -Name explorer -ErrorAction SilentlyContinue
+    if ($expl) {
+        Write-Info "Stopping Explorer..."
+        $expl | Stop-Process -Force -ErrorAction Stop
+        # Wait for explorer to exit
+        $timeout = 10
+        $sw = [Diagnostics.Stopwatch]::StartNew()
+        while (Get-Process -Name explorer -ErrorAction SilentlyContinue -EA SilentlyContinue -ne $null -and $sw.Elapsed.TotalSeconds -lt $timeout) {
+            Start-Sleep -Milliseconds 250
+        }
+    }
 
-Write-OK "Explorer restarted."
+    # Remove taskbar cache files (only those that exist)
+    Write-Info "Removing taskbar cache files from $taskbarCache"
+    Get-ChildItem -Path $taskbarCache -Filter "taskbar*.db" -File -ErrorAction SilentlyContinue |
+        ForEach-Object {
+            try {
+                Remove-Item -LiteralPath $_.FullName -Force -ErrorAction Stop
+                Write-Info "Removed $($_.Name)"
+            } catch {
+                Write-Warning "Could not remove $($_.Name): $($_.Exception.Message)"
+            }
+        }
+
+    # Start Explorer and verify
+    Write-Info "Starting Explorer..."
+    Start-Process -FilePath "explorer.exe"
+    Start-Sleep -Seconds 2
+    if (Get-Process -Name explorer -ErrorAction SilentlyContinue) {
+        Write-OK "Explorer restarted successfully."
+    } else {
+        Write-Error "Explorer did not start. Check shell registry and user context."
+    }
+} catch {
+    Write-Error "Taskbar cleanup failed: $($_.Exception.Message)"
+}
+
 
 
 # 18. AUTOMATIC REBOOT WITH BANNER
@@ -809,6 +758,7 @@ Write-Host ""
 
 Start-Sleep -Seconds $rebootDelay
 shutdown /r /t 0
+
 
 
 
