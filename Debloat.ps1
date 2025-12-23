@@ -8,8 +8,8 @@ $IsAdmin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIde
 if (-not $IsAdmin) {
     Write-Host "[ERROR] Run this script as Administrator." -ForegroundColor Red
     Write-Host ""
-    Write-Host "This window will close in 10 seconds..." -ForegroundColor Yellow
-    Start-Sleep -Seconds 10
+    Write-Host "This window will close in 5 seconds..." -ForegroundColor Yellow
+    Start-Sleep -Seconds 5
     exit 1
 }
 
@@ -255,9 +255,6 @@ reg add "HKLM\Software\Policies\Microsoft\Windows\Windows Search" /v AllowCortan
 # Disable Cloud Search
 reg add "HKLM\Software\Policies\Microsoft\Windows\Windows Search" /v AllowCloudSearch /t REG_DWORD /d 0 /f > $null
 
-# Disable Web Search in Start Menu
-reg add "HKLM\Software\Policies\Microsoft\Windows\Windows Search" /v DisableSearch /t REG_DWORD /d 1 /f > $null
-
 # Disable Consumer Experience
 reg add "HKLM\Software\Policies\Microsoft\Windows\CloudContent" /v DisableConsumerFeatures /t REG_DWORD /d 1 /f > $null
 
@@ -426,6 +423,7 @@ reg add "HKLM\System\CurrentControlSet\Control\DeviceGuard\Scenarios\HypervisorE
 
 Write-Info "Applying SvcHostSplitThresholdInKB..."
 reg add "HKLM\SYSTEM\CurrentControlSet\Control" /v SvcHostSplitThresholdInKB /t REG_DWORD /d 67108864 /f > $null
+
 
 # 8. LOCALE, TIMEZONE, LANGUAGE
 # ============================================================================
@@ -710,7 +708,6 @@ reg add "HKLM\Software\Policies\Microsoft\Windows\Explorer" /v NoUseStoreOpenWit
 
 # Web search in Start (Bing)
 reg add "HKCU\Software\Policies\Microsoft\Windows\Explorer" /v DisableSearchBoxSuggestions /t REG_DWORD /d 1 /f > $null
-reg add "HKLM\Software\Policies\Microsoft\Windows\Windows Search" /v DisableSearch /t REG_DWORD /d 1 /f > $null
 
 # Cloud Content (ads in Settings, Start, lock screen)
 reg add "HKLM\Software\Policies\Microsoft\Windows\CloudContent" /v DisableConsumerFeatures /t REG_DWORD /d 1 /f > $null
@@ -749,9 +746,6 @@ reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" /v St
 
 Write-OK "Extended privacy and anti-advertising hardening applied."
 
-# 15. APPLICATION INSTALLATION (Chrome, 7-Zip, Notepad++, Discord, Steam)
-# ============================================================================
-
 function Write-Info { param($m) Write-Host "[INFO]  $m" -ForegroundColor Cyan }
 function Write-OK   { param($m) Write-Host "[OK]    $m" -ForegroundColor Green }
 function Write-Warn { param($m) Write-Host "[WARN]  $m" -ForegroundColor Yellow }
@@ -759,18 +753,7 @@ function Write-Err  { param($m) Write-Host "[ERROR] $m" -ForegroundColor Red }
 
 Write-Info "Checking required applications..."
 
-# -------------------------
-# INSTALL TOGGLES
-# -------------------------
-$InstallChrome   = $true
-$Install7Zip     = $true
-$InstallNPP      = $true
-$InstallDiscord  = $true
-$InstallSteam    = $true
-
-# -------------------------
-# Helper: Check if an app exists in uninstall registry
-# -------------------------
+# Helper: Check if an app exists in uninstall registry (HKLM 64/32-bit and HKCU)
 function Test-AppInstalled {
     param([string]$Name)
 
@@ -793,44 +776,63 @@ function Test-AppInstalled {
     return $false
 }
 
+# Helper: Ask Yes/No
+function Ask-Install {
+    param([string]$AppName)
+
+    $answer = Read-Host "Do you want to install $AppName? (Y/N)"
+    return ($answer -match '^[Yy]$')
+}
+
 # -------------------------
 # GOOGLE CHROME
 # -------------------------
-if ($InstallChrome) {
-    $chromeInstalled = Test-AppInstalled "Google Chrome"
+if (-not (Test-AppInstalled "Google Chrome")) {
 
-    if (-not $chromeInstalled) {
+    if (Ask-Install "Google Chrome") {
+
         Write-Info "Installing Google Chrome (silent)..."
         $chromeInstaller = Join-Path $env:TEMP 'chrome_installer.exe'
+
         try {
             Invoke-WebRequest -Uri "https://dl.google.com/chrome/install/latest/chrome_installer.exe" -OutFile $chromeInstaller -UseBasicParsing -ErrorAction Stop
+            if (-not (Test-Path -Path $chromeInstaller)) { throw "Download failed: $chromeInstaller not found." }
+
             Start-Process -FilePath $chromeInstaller -ArgumentList "/silent","/install" -Wait -ErrorAction Stop
             Write-OK "Google Chrome installed."
 
-            # Set Chrome as default ONLY if installed now
             Write-Info "Setting Chrome as default browser..."
             $chromeExe = Join-Path $env:ProgramFiles 'Google\Chrome\Application\chrome.exe'
-            if (Test-Path $chromeExe) {
+
+            if (Test-Path -Path $chromeExe) {
                 Start-Process -FilePath $chromeExe -ArgumentList '--make-default-browser'
                 Write-OK "Chrome set as default browser."
+            } else {
+                Write-Warn "Chrome executable not found after installation."
             }
+
         } catch {
             Write-Err "Failed to install Google Chrome: $($_.Exception.Message)"
         }
+
     } else {
-        Write-Info "Google Chrome already installed — skipping."
+        Write-Info "Skipping Google Chrome installation."
     }
+
 } else {
-    Write-Info "Chrome installation disabled by toggle."
+    Write-Info "Google Chrome already installed — skipping."
 }
 
 # -------------------------
 # 7-ZIP
 # -------------------------
-if ($Install7Zip) {
-    if (-not (Test-AppInstalled "7-Zip")) {
+if (-not (Test-AppInstalled "7-Zip")) {
+
+    if (Ask-Install "7-Zip") {
+
         Write-Info "Installing 7-Zip (silent)..."
         $zipInstaller = Join-Path $env:TEMP '7zip_installer.exe'
+
         try {
             Invoke-WebRequest -Uri "https://www.7-zip.org/a/7z2408-x64.exe" -OutFile $zipInstaller -UseBasicParsing -ErrorAction Stop
             Start-Process -FilePath $zipInstaller -ArgumentList "/S" -Wait -ErrorAction Stop
@@ -838,84 +840,97 @@ if ($Install7Zip) {
         } catch {
             Write-Err "Failed to install 7-Zip: $($_.Exception.Message)"
         }
+
     } else {
-        Write-Info "7-Zip already installed — skipping."
+        Write-Info "Skipping 7-Zip installation."
     }
+
 } else {
-    Write-Info "7-Zip installation disabled by toggle."
+    Write-Info "7-Zip already installed — skipping."
 }
 
 # -------------------------
 # NOTEPAD++
 # -------------------------
-if ($InstallNPP) {
-    if (-not (Test-AppInstalled "Notepad++")) {
+if (-not (Test-AppInstalled "Notepad++")) {
+
+    if (Ask-Install "Notepad++") {
+
         Write-Info "Installing Notepad++ (silent)..."
         $npInstaller = Join-Path $env:TEMP 'npp_installer.exe'
-        $nppUrl = "https://github.com/notepad-plus-plus/notepad-plus-plus/releases/latest/download/npp.Installer.x64.exe"
+        $apiUrl = "https://api.github.com/repos/notepad-plus-plus/notepad-plus-plus/releases/latest"
 
         try {
-            Invoke-WebRequest -Uri $nppUrl -OutFile $npInstaller -UseBasicParsing -ErrorAction Stop
+            Write-Info "Fetching latest Notepad++ release info from GitHub API..."
+            $headers = @{ "User-Agent" = "Mozilla/5.0" }
+            $release = Invoke-RestMethod -Uri $apiUrl -Headers $headers -ErrorAction Stop
+
+            $asset = $release.assets |
+                Where-Object { $_.name -match "Installer.*x64.*\.exe$" } |
+                Select-Object -First 1
+
+            if (-not $asset) { throw "Could not locate Notepad++ installer in GitHub API response." }
+
+            $nppUrl = $asset.browser_download_url
+            Write-Info "Downloading Notepad++ from: $nppUrl"
+
+            Start-BitsTransfer -Source $nppUrl -Destination $npInstaller -ErrorAction Stop
             Start-Process -FilePath $npInstaller -ArgumentList "/S" -Wait -ErrorAction Stop
             Write-OK "Notepad++ installed."
-        } catch {
+        }
+        catch {
             Write-Err "Failed to install Notepad++: $($_.Exception.Message)"
         }
+
     } else {
-        Write-Info "Notepad++ already installed — skipping."
+        Write-Info "Skipping Notepad++ installation."
     }
+
 } else {
-    Write-Info "Notepad++ installation disabled by toggle."
+    Write-Info "Notepad++ already installed — skipping."
 }
 
 # -------------------------
 # DISCORD
 # -------------------------
-if ($InstallDiscord) {
-    if (-not (Test-AppInstalled "Discord")) {
+if (-not (Test-AppInstalled "Discord")) {
+
+    if (Ask-Install "Discord") {
+
         Write-Info "Installing Discord (silent)..."
         $discordInstaller = Join-Path $env:TEMP 'discord_installer.exe'
-        $discordUrl = "https://discord.com/api/download?platform=win&format=exe"
+        $discordUrl = "https://dl.discordapp.net/apps/win/0.0.309/DiscordSetup.exe"
 
         try {
-            Invoke-WebRequest -Uri $discordUrl -OutFile $discordInstaller -UseBasicParsing -ErrorAction Stop
+            [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+            $headers = @{ "User-Agent" = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" }
+
+            Invoke-WebRequest -Uri $discordUrl -OutFile $discordInstaller -Headers $headers -ErrorAction Stop
             Start-Process -FilePath $discordInstaller -ArgumentList "/S" -Wait -ErrorAction Stop
             Write-OK "Discord installed."
-        } catch {
+        }
+        catch {
             Write-Err "Failed to install Discord: $($_.Exception.Message)"
         }
+
     } else {
-        Write-Info "Discord already installed — skipping."
+        Write-Info "Skipping Discord installation."
     }
+
 } else {
-    Write-Info "Discord installation disabled by toggle."
+    Write-Info "Discord already installed — skipping."
 }
 
 # -------------------------
 # STEAM
 # -------------------------
-if ($InstallSteam) {
-    if (-not (Test-AppInstalled "Steam")) {
+if (-not (Test-AppInstalled "Steam")) {
+
+    if (Ask-Install "Steam") {
+
         Write-Info "Installing Steam (silent)..."
         $steamInstaller = Join-Path $env:TEMP 'steam_installer.exe'
-        $steamUrl = "https://cdn.cloudflare.steamstatic.com/client/installer/SteamSetup.exe"
-
-        try {
-            Invoke-WebRequest -Uri $steamUrl -OutFile $steamInstaller -UseBasicParsing -ErrorAction Stop
-            Start-Process -FilePath $steamInstaller -ArgumentList "/S" -Wait -ErrorAction Stop
-            Write-OK "Steam installed."
-        } catch {
-            Write-Err "Failed to install Steam: $($_.Exception.Message)"
-        }
-    } else {
-        Write-Info "Steam already installed — skipping."
-    }
-} else {
-    Write-Info "Steam installation disabled by toggle."
-}
-
-Write-OK "Application installation and configuration complete."
-
+        $steam
 
 # 16. TASKBAR CACHE CLEANUP + EXPLORER RESTART
 # ============================================================================
@@ -954,16 +969,39 @@ try {
         Write-Host "Taskbar cache folder not found: $taskbarCache"
     }
 
-    # Start Explorer and verify
-    Write-Host "Starting Explorer..."
-    Start-Process -FilePath "explorer.exe"
-    Start-Sleep -Seconds 2
+    # Fully silent Explorer restart (no window opens)
+    Write-Host "Restarting Explorer silently..."
 
-    if (Get-Process -Name explorer -ErrorAction SilentlyContinue) {
-        Write-Host "Explorer restarted successfully."
-    } else {
-        Write-Error "Explorer did not start. Check shell registry and user context."
-    }
+    $signature = @"
+using System;
+using System.Runtime.InteropServices;
+
+public class RestartShell {
+    [DllImport("user32.dll", SetLastError=true)]
+    public static extern int SendMessageTimeout(
+        IntPtr hWnd, int Msg, IntPtr wParam, IntPtr lParam,
+        int flags, int timeout, out IntPtr result);
+}
+"@
+
+    Add-Type $signature -ErrorAction SilentlyContinue
+
+    $HWND_BROADCAST = [IntPtr]0xffff
+    $WM_SETTINGCHANGE = 0x1A
+
+    [IntPtr]$result = 0
+    [RestartShell]::SendMessageTimeout(
+        $HWND_BROADCAST,
+        $WM_SETTINGCHANGE,
+        0,
+        0,
+        2,
+        5000,
+        [ref]$result
+    ) | Out-Null
+
+    Write-Host "Explorer restarted successfully (silent)."
+
 } catch {
     Write-Error "Taskbar cleanup failed: $($_.Exception.Message)"
 }
@@ -986,4 +1024,3 @@ Write-Host ""
 
 Start-Sleep -Seconds $rebootDelay
 shutdown /r /t 0
-
