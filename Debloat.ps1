@@ -640,7 +640,6 @@ reg add "HKLM\Software\Policies\Microsoft\Windows\Explorer" /v NoUseStoreOpenWit
 
 # Web search in Start (Bing)
 reg add "HKCU\Software\Policies\Microsoft\Windows\Explorer" /v DisableSearchBoxSuggestions /t REG_DWORD /d 1 /f > $null
-reg add "HKLM\Software\Policies\Microsoft\Windows\Windows Search" /v DisableSearch /t REG_DWORD /d 1 /f > $null
 
 # Cloud Content (ads in Settings, Start, lock screen)
 reg add "HKLM\Software\Policies\Microsoft\Windows\CloudContent" /v DisableConsumerFeatures /t REG_DWORD /d 1 /f > $null
@@ -906,6 +905,7 @@ Write-Host ""
 
 Start-Sleep -Seconds $rebootDelay
 shutdown /r /t 0
+
 
 
 
