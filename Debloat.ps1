@@ -741,37 +741,22 @@ if (-not $chromeInstalled) {
     Write-Info "Google Chrome already installed — skipping installation."
 }
 
-# Set Chrome as default browser
+# Set Chrome as default browser (current user)
 Write-Info "Setting Chrome as default browser..."
-
-$xml = @"
-<?xml version="1.0" encoding="UTF-8"?>
-<DefaultAssociations>
-    <Association Identifier=".htm" ProgId="ChromeHTML" ApplicationName="Google Chrome" />
-    <Association Identifier=".html" ProgId="ChromeHTML" ApplicationName="Google Chrome" />
-    <Association Identifier="http" ProgId="ChromeHTML" ApplicationName="Google Chrome" />
-    <Association Identifier="https" ProgId="ChromeHTML" ApplicationName="Google Chrome" />
-</DefaultAssociations>
-"@
-
-$xmlPath = "$env:TEMP\chrome-defaults.xml"
-$xml | Out-File -FilePath $xmlPath -Encoding ASCII
-
-Dism.exe /Online /Import-DefaultAppAssociations:$xmlPath | Out-Null
-
+Start-Process "$env:ProgramFiles\Google\Chrome\Application\chrome.exe" --make-default-browser
 Write-OK "Chrome set as default browser."
 
-# Pin Chrome to taskbar
-Write-Info "Pinning Google Chrome to taskbar..."
+# Pin Chrome to taskbar (Windows 11 supported method)
+Write-Info "Pinning Chrome to taskbar..."
 
-$chromePath = "C:\Program Files\Google\Chrome\Application\chrome.exe"
-if (Test-Path $chromePath) {
-    $shell = New-Object -ComObject Shell.Application
-    $item = $shell.Namespace((Split-Path $chromePath)).ParseName((Split-Path $chromePath -Leaf))
-    $item.InvokeVerb("taskbarpin")
+$chromeLnk = "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Google Chrome.lnk"
+$taskbarPath = "$env:APPDATA\Microsoft\Internet Explorer\Quick Launch\User Pinned\TaskBar"
+
+if (Test-Path $chromeLnk) {
+    Copy-Item $chromeLnk $taskbarPath -Force
     Write-OK "Chrome pinned to taskbar."
 } else {
-    Write-Info "Chrome executable not found — skipping taskbar pin."
+    Write-Info "Chrome shortcut not found — skipping taskbar pin."
 }
 
 # -------------------------
@@ -815,6 +800,20 @@ Get-ChildItem $taskbarCache -Filter "taskbar*.db" -ErrorAction SilentlyContinue 
 
 Write-Info "Restarting Explorer..."
 Get-Process -Name 'explorer' -ErrorAction SilentlyContinue | Stop-Process -Force
+Start-Process explorer.exe
+Write-OK "Explorer restarted."
+
+# 17. TASKBAR CACHE CLEANUP + EXPLORER RESTART
+# ============================================================================
+
+Write-Info "Cleaning taskbar cache..."
+
+$taskbarCache = Join-Path $env:LOCALAPPDATA "Microsoft\Windows\Explorer"
+Get-ChildItem $taskbarCache -Filter "taskbar*.db" -ErrorAction SilentlyContinue |
+    Remove-Item -Force -ErrorAction SilentlyContinue
+
+Write-Info "Restarting Explorer..."
+Get-Process -Name 'explorer' -ErrorAction SilentlyContinue | Stop-Process -Force
 
 Write-OK "Explorer restarted."
 
@@ -837,6 +836,7 @@ Write-Host ""
 
 Start-Sleep -Seconds $rebootDelay
 shutdown /r /t 0
+
 
 
 
