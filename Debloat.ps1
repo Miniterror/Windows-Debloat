@@ -772,12 +772,16 @@ if (-not (Test-AppInstalled "7-Zip")) {
 # -------------------------
 # NOTEPAD++
 # -------------------------
+
+# Force TLS 1.2 for GitHub downloads (prevents connection drops)
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+
 if (-not (Test-AppInstalled "Notepad++")) {
     Write-Info "Installing Notepad++ (silent)..."
     $npInstaller = Join-Path $env:TEMP 'npp_installer.exe'
 
-    # Always-working URL for latest 64-bit installer
-    $nppUrl = "https://github.com/notepad-plus-plus/notepad-plus-plus/releases/latest/download/npp.Installer.x64.exe"
+    # Stable, always-working URL for latest 64-bit installer
+    $nppUrl = "https://github.com/notepad-plus-plus/notepad-plus-plus/releases/latest/download/npp.64-bit.Installer.exe"
 
     try {
         Invoke-WebRequest -Uri $nppUrl -OutFile $npInstaller -UseBasicParsing -ErrorAction Stop
@@ -794,9 +798,12 @@ if (-not (Test-AppInstalled "Notepad++")) {
 # -------------------------
 # DISCORD
 # -------------------------
+
 if (-not (Test-AppInstalled "Discord")) {
     Write-Info "Installing Discord (silent)..."
-    $discordInstaller = Join-Path $env:TEMP 'discord_installer.exe'
+
+    # Download to a safe location (TEMP sometimes causes permission issues)
+    $discordInstaller = "$env:USERPROFILE\Downloads\discord_installer.exe"
     $discordUrl = "https://discord.com/api/download?platform=win&format=exe"
 
     try {
@@ -902,3 +909,4 @@ Write-Host ""
 
 Start-Sleep -Seconds $rebootDelay
 shutdown /r /t 0
+
