@@ -68,7 +68,8 @@ $allAppxSelectors = @(
     'MicrosoftTeams','MSTeams','Microsoft.Wallet','Microsoft.YourPhone'
 )
 
-Remove-AppPackagesSelectors -Patterns $allAppxSelectors
+# FIXED: use -Selectors instead of -Patterns
+Remove-AppPackagesSelectors -Selectors $allAppxSelectors
 
 # ============================================================================
 # 3. WINDOWS CAPABILITIES & FEATURES
@@ -176,17 +177,38 @@ reg add "HKLM\Software\Policies\Microsoft\Windows\OneDrive" /v DisableFileSyncNG
 reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\SettingSync" /v SyncSettings /t REG_DWORD /d 0 /f > $null
 
 # ============================================================================
-# 6. COPILOT, WEBSHELL, TASKBAR UI
+# 6. COPILOT, WEBSHELL, TASKBAR UI, WIDGETS
 # ============================================================================
 
-Write-Info "Disabling Copilot and shell clutter..."
+Write-Info "Disabling Copilot, Widgets and shell clutter..."
 
 # Windows Copilot policies
 reg add "HKCU\Software\Policies\Microsoft\Windows\WindowsCopilot" /v TurnOffWindowsCopilot /t REG_DWORD /d 1 /f > $null
 reg add "HKLM\Software\Policies\Microsoft\Windows\WindowsCopilot" /v TurnOffWindowsCopilot /t REG_DWORD /d 1 /f > $null
 
-# Remove WebExperience (Copilot/feeds host)
-Remove-AppPackagesSelectors -Patterns @("MicrosoftWindows.Client.WebExperience*")
+# Hide Copilot button on taskbar
+reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" /v ShowCopilotButton /t REG_DWORD /d 0 /f > $null
+
+# Widgets: disable taskbar icon and backend where possible
+reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" /v TaskbarDa /t REG_DWORD /d 0 /f > $null
+reg add "HKLM\Software\Policies\Microsoft\Dsh" /v AllowNewsAndInterests /t REG_DWORD /d 0 /f > $null
+
+# Remove WebExperience / Widgets packages where possible
+Remove-AppPackagesSelectors -Selectors @(
+    "MicrosoftWindows.Client.WebExperience*",
+    "MicrosoftWindows.Client.CBS*",
+    "MicrosoftWindows.Client.Core*"
+)
+
+Get-AppxPackage -AllUsers *WebExperience* | ForEach-Object {
+    Write-Remove "Removing WebExperience Appx: $($_.Name)"
+    Remove-AppxPackage -Package $_.PackageFullName -AllUsers -ErrorAction SilentlyContinue
+}
+
+Get-AppxPackage -AllUsers *WindowsWidgets* | ForEach-Object {
+    Write-Remove "Removing Widgets Appx: $($_.Name)"
+    Remove-AppxPackage -Package $_.PackageFullName -AllUsers -ErrorAction SilentlyContinue
+}
 
 # Taskbar & Start UI
 reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Search" /v SearchboxTaskbarMode /t REG_DWORD /d 0 /f > $null
@@ -196,12 +218,21 @@ reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" /v St
 reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" /v Start_TrackProgs /t REG_DWORD /d 0 /f > $null
 reg add "HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Advanced" /v ShowSyncProviderNotifications /t REG_DWORD /d 0 /f > $null
 
+# Force taskbar alignment to left
+reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" /v TaskbarAl /t REG_DWORD /d 0 /f > $null
+
 # Taskbar pinned items
 $taskbarPins = "$env:APPDATA\Microsoft\Internet Explorer\Quick Launch\User Pinned\TaskBar"
 if (Test-Path $taskbarPins) {
     Write-Info "Clearing taskbar pins..."
     Get-ChildItem $taskbarPins | Remove-Item -Force -ErrorAction SilentlyContinue
 }
+
+# Prevent automatic repinning of default layout (Store etc.)
+schtasks /Change /TN "Microsoft\Windows\Shell\TaskbarLayoutModification" /Disable 2>$null
+
+# Mark favorites as changed so Windows doesn't restore defaults
+reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Taskband" /v FavoritesRemovedChanges /t REG_DWORD /d 1 /f > $null
 
 # Start menu pins
 Write-Info "Clearing Start menu pins..."
@@ -319,7 +350,7 @@ if (Test-Path $defaultNtUser) {
 }
 
 # ============================================================================
-# 11. EDGE POLICIES
+# 11. EDGE POLICIES + EU BROWSER UNINSTALL
 # ============================================================================
 
 Write-Info "Applying Edge policies..."
@@ -327,6 +358,27 @@ Write-Info "Applying Edge policies..."
 reg add "HKLM\Software\Policies\Microsoft\Edge" /v HideFirstRunExperience /t REG_DWORD /d 1 /f > $null
 reg add "HKLM\Software\Policies\Microsoft\Edge\Recommended" /v BackgroundModeEnabled /t REG_DWORD /d 0 /f > $null
 reg add "HKLM\Software\Policies\Microsoft\Edge\Recommended" /v StartupBoostEnabled /t REG_DWORD /d 0 /f > $null
+
+# Extra: prevent automatic upgrading to Edge in some scenarios
+reg add "HKLM\Software\Policies\Microsoft\EdgeUpdate" /v DoNotUpdateToEdgeWithChromium /t REG_DWORD /d 1 /f > $null
+
+Write-Info "Attempting to uninstall Microsoft Edge browser (EU builds)..."
+
+try {
+    $edgeInstaller = Get-ChildItem "C:\Program Files (x86)\Microsoft\Edge\Application" -Directory -ErrorAction SilentlyContinue |
+        ForEach-Object { Join-Path $_.FullName "Installer\setup.exe" } |
+        Where-Object { Test-Path $_ } |
+        Select-Object -First 1
+
+    if ($edgeInstaller) {
+        & $edgeInstaller --uninstall --system-level --force-uninstall --verbose-logging
+        Write-OK "Microsoft Edge browser uninstall command executed."
+    } else {
+        Write-Info "Edge installer not found – Edge may already be removed."
+    }
+} catch {
+    Write-Info "Edge uninstall attempt failed – continuing..."
+}
 
 # ============================================================================
 # 12. EXPLORER / SEARCH / THIS PC
@@ -355,11 +407,23 @@ Remove-Item -LiteralPath 'C:\Windows\System32\OneDriveSetup.exe','C:\Windows\Sys
 Remove-Item -LiteralPath "C:\Users\Default\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\OneDrive.lnk" -ErrorAction SilentlyContinue
 
 # ============================================================================
-# 14. EXPLORER RESTART
+# 14. TASKBAR CACHE CLEANUP + EXPLORER RESTART
 # ============================================================================
+
+Write-Info "Cleaning taskbar cache..."
+$taskbarCache = Join-Path $env:LOCALAPPDATA "Microsoft\Windows\Explorer"
+Get-ChildItem $taskbarCache -Filter "taskbar*.db" -ErrorAction SilentlyContinue | Remove-Item -Force -ErrorAction SilentlyContinue
 
 Write-Info "Restarting Explorer..."
 Get-Process -Name 'explorer' -ErrorAction SilentlyContinue | Stop-Process -Force
 
 Write-OK "Full SuperDebloat completed."
+
 Stop-Transcript
+
+# ============================================================================
+# 15. AUTOMATIC REBOOT
+# ============================================================================
+
+Write-Info "System will reboot in 5 seconds..."
+shutdown /r /t 5
