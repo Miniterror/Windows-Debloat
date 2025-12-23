@@ -255,9 +255,6 @@ reg add "HKLM\Software\Policies\Microsoft\Windows\Windows Search" /v AllowCortan
 # Disable Cloud Search
 reg add "HKLM\Software\Policies\Microsoft\Windows\Windows Search" /v AllowCloudSearch /t REG_DWORD /d 0 /f > $null
 
-# Disable Web Search in Start Menu
-reg add "HKLM\Software\Policies\Microsoft\Windows\Windows Search" /v DisableSearch /t REG_DWORD /d 1 /f > $null
-
 # Disable Consumer Experience
 reg add "HKLM\Software\Policies\Microsoft\Windows\CloudContent" /v DisableConsumerFeatures /t REG_DWORD /d 1 /f > $null
 
@@ -922,6 +919,7 @@ Write-Host ""
 
 Start-Sleep -Seconds $rebootDelay
 shutdown /r /t 0
+
 
 
 
