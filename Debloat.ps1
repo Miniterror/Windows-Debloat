@@ -437,13 +437,85 @@ reg add "HKLM\SYSTEM\CurrentControlSet\Control" /v SvcHostSplitThresholdInKB /t 
 # 8. LOCALE, TIMEZONE, LANGUAGE
 # ============================================================================
 
-Write-Info "Setting locale/timezone to NL / W. Europe..."
+Write-Info "Windows Region & Language Configuration"
 
-tzutil /s "W. Europe Standard Time"
-Set-WinSystemLocale nl-NL
-Set-WinUserLanguageList nl-NL -Force
-Set-Culture nl-NL
-Set-WinHomeLocation -GeoId 176  # Nederland
+# -------------------------
+# Helper: Menu Selection
+# -------------------------
+function Show-Menu {
+    param(
+        [string]$Title,
+        [array]$Options
+    )
+
+    Write-Host ""
+    Write-Host "=== $Title ==="
+    for ($i = 0; $i -lt $Options.Count; $i++) {
+        Write-Host "[$($i+1)] $($Options[$i])"
+    }
+
+    do {
+        $choice = Read-Host "Choose an option (1-$($Options.Count))"
+    } until ($choice -match "^[1-$($Options.Count)]$")
+
+    return $Options[$choice - 1]
+}
+
+# -------------------------
+# TIMEZONE SELECTION
+# -------------------------
+
+$timezones = @(
+    "W. Europe Standard Time (NL, BE, DE, FR)",
+    "GMT Standard Time (UK, IE)",
+    "Romance Standard Time (FR, ES)",
+    "Pacific Standard Time (US West Coast)",
+    "Eastern Standard Time (US East Coast)"
+)
+
+$tzChoice = Show-Menu "Select your Timezone" $timezones
+
+switch -Wildcard ($tzChoice) {
+    "*W. Europe*" { $tz = "W. Europe Standard Time" }
+    "*GMT*"       { $tz = "GMT Standard Time" }
+    "*Romance*"   { $tz = "Romance Standard Time" }
+    "*Pacific*"   { $tz = "Pacific Standard Time" }
+    "*Eastern*"   { $tz = "Eastern Standard Time" }
+}
+
+Write-Info "Setting timezone to $tz..."
+tzutil /s "$tz"
+
+# -------------------------
+# LANGUAGE / LOCALE SELECTION
+# -------------------------
+
+$languages = @(
+    "Dutch (nl-NL)",
+    "English US (en-US)",
+    "English UK (en-GB)",
+    "German (de-DE)",
+    "French (fr-FR)"
+)
+
+$langChoice = Show-Menu "Select your Language & Locale" $languages
+
+switch -Wildcard ($langChoice) {
+    "*Dutch*"   { $lang = "nl-NL"; $geo = 176 }
+    "*US*"      { $lang = "en-US"; $geo = 244 }
+    "*UK*"      { $lang = "en-GB"; $geo = 242 }
+    "*German*"  { $lang = "de-DE"; $geo = 94 }
+    "*French*"  { $lang = "fr-FR"; $geo = 84 }
+}
+
+Write-Info "Applying language/locale: $lang"
+
+Set-WinSystemLocale $lang
+Set-WinUserLanguageList $lang -Force
+Set-Culture $lang
+Set-WinHomeLocation -GeoId $geo
+
+Write-OK "Locale, language, and timezone configuration complete."
 
 
 # 9. THEME / ACCENT COLOR
@@ -725,84 +797,110 @@ function Test-AppInstalled {
     return $false
 }
 
+# Helper: Ask Yes/No with default Yes
+function Ask-YesNo {
+    param(
+        [string]$Message
+    )
+    $answer = Read-Host "$Message (Y/N, default = Y)"
+    if ($answer -eq "" -or $answer -match "^[Yy]") { return $true }
+    return $false
+}
+
 # -------------------------
 # GOOGLE CHROME
 # -------------------------
 
-$chromeInstalled = Test-AppInstalled "Google Chrome"
+if (Ask-YesNo "Install Google Chrome") {
 
-if (-not $chromeInstalled) {
-    Write-Info "Installing Google Chrome (silent)..."
-    $chromeInstaller = "$env:TEMP\chrome_installer.exe"
-    Invoke-WebRequest "https://dl.google.com/chrome/install/latest/chrome_installer.exe" -OutFile $chromeInstaller -UseBasicParsing
-    Start-Process $chromeInstaller -ArgumentList "/silent /install" -Wait
-    Write-OK "Google Chrome installed."
+    $chromeInstalled = Test-AppInstalled "Google Chrome"
+
+    if (-not $chromeInstalled) {
+        Write-Info "Installing Google Chrome (silent)..."
+        $chromeInstaller = "$env:TEMP\chrome_installer.exe"
+        Invoke-WebRequest "https://dl.google.com/chrome/install/latest/chrome_installer.exe" -OutFile $chromeInstaller -UseBasicParsing
+        Start-Process $chromeInstaller -ArgumentList "/silent /install" -Wait
+        Write-OK "Google Chrome installed."
+    } else {
+        Write-Info "Google Chrome already installed — skipping installation."
+    }
+
+    # Set Chrome as default browser (current user)
+    Write-Info "Setting Chrome as default browser..."
+    Start-Process "$env:ProgramFiles\Google\Chrome\Application\chrome.exe" --make-default-browser
+    Write-OK "Chrome set as default browser."
+
+    # Pin Chrome to taskbar (Windows 11 supported method)
+    Write-Info "Pinning Chrome to taskbar..."
+
+    $chromeLnk = "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Google Chrome.lnk"
+    $taskbarPath = "$env:APPDATA\Microsoft\Internet Explorer\Quick Launch\User Pinned\TaskBar"
+
+    if (Test-Path $chromeLnk) {
+        Copy-Item $chromeLnk $taskbarPath -Force
+        Write-OK "Chrome pinned to taskbar."
+    } else {
+        Write-Info "Chrome shortcut not found — skipping taskbar pin."
+    }
 } else {
-    Write-Info "Google Chrome already installed — skipping installation."
-}
-
-# Set Chrome as default browser
-Write-Info "Setting Chrome as default browser..."
-
-$xml = @"
-<?xml version="1.0" encoding="UTF-8"?>
-<DefaultAssociations>
-    <Association Identifier=".htm" ProgId="ChromeHTML" ApplicationName="Google Chrome" />
-    <Association Identifier=".html" ProgId="ChromeHTML" ApplicationName="Google Chrome" />
-    <Association Identifier="http" ProgId="ChromeHTML" ApplicationName="Google Chrome" />
-    <Association Identifier="https" ProgId="ChromeHTML" ApplicationName="Google Chrome" />
-</DefaultAssociations>
-"@
-
-$xmlPath = "$env:TEMP\chrome-defaults.xml"
-$xml | Out-File -FilePath $xmlPath -Encoding ASCII
-
-Dism.exe /Online /Import-DefaultAppAssociations:$xmlPath | Out-Null
-
-Write-OK "Chrome set as default browser."
-
-# Pin Chrome to taskbar
-Write-Info "Pinning Google Chrome to taskbar..."
-
-$chromePath = "C:\Program Files\Google\Chrome\Application\chrome.exe"
-if (Test-Path $chromePath) {
-    $shell = New-Object -ComObject Shell.Application
-    $item = $shell.Namespace((Split-Path $chromePath)).ParseName((Split-Path $chromePath -Leaf))
-    $item.InvokeVerb("taskbarpin")
-    Write-OK "Chrome pinned to taskbar."
-} else {
-    Write-Info "Chrome executable not found — skipping taskbar pin."
+    Write-Info "Skipping Google Chrome installation."
 }
 
 # -------------------------
 # 7-ZIP
 # -------------------------
 
-if (-not (Test-AppInstalled "7-Zip")) {
-    Write-Info "Installing 7-Zip (silent)..."
-    $zipInstaller = "$env:TEMP\7zip_installer.exe"
-    Invoke-WebRequest "https://www.7-zip.org/a/7z2408-x64.exe" -OutFile $zipInstaller -UseBasicParsing
-    Start-Process $zipInstaller -ArgumentList "/S" -Wait
-    Write-OK "7-Zip installed."
+if (Ask-YesNo "Install 7-Zip") {
+
+    if (-not (Test-AppInstalled "7-Zip")) {
+        Write-Info "Installing 7-Zip (silent)..."
+        $zipInstaller = "$env:TEMP\7zip_installer.exe"
+        Invoke-WebRequest "https://www.7-zip.org/a/7z2408-x64.exe" -OutFile $zipInstaller -UseBasicParsing
+        Start-Process $zipInstaller -ArgumentList "/S" -Wait
+        Write-OK "7-Zip installed."
+    } else {
+        Write-Info "7-Zip already installed — skipping."
+    }
+
 } else {
-    Write-Info "7-Zip already installed — skipping."
+    Write-Info "Skipping 7-Zip installation."
 }
 
 # -------------------------
 # NOTEPAD++
 # -------------------------
 
-if (-not (Test-AppInstalled "Notepad++")) {
-    Write-Info "Installing Notepad++ (silent)..."
-    $npInstaller = "$env:TEMP\npp_installer.exe"
-    Invoke-WebRequest "https://github.com/notepad-plus-plus/notepad-plus-plus/releases/latest/download/npp.8.6.7.Installer.x64.exe" -OutFile $npInstaller -UseBasicParsing
-    Start-Process $npInstaller -ArgumentList "/S" -Wait
-    Write-OK "Notepad++ installed."
+if (Ask-YesNo "Install Notepad++") {
+
+    if (-not (Test-AppInstalled "Notepad++")) {
+        Write-Info "Installing Notepad++ (silent)..."
+        $npInstaller = "$env:TEMP\npp_installer.exe"
+        Invoke-WebRequest "https://github.com/notepad-plus-plus/notepad-plus-plus/releases/latest/download/npp.8.6.7.Installer.x64.exe" -OutFile $npInstaller -UseBasicParsing
+        Start-Process $npInstaller -ArgumentList "/S" -Wait
+        Write-OK "Notepad++ installed."
+    } else {
+        Write-Info "Notepad++ already installed — skipping."
+    }
+
 } else {
-    Write-Info "Notepad++ already installed — skipping."
+    Write-Info "Skipping Notepad++ installation."
 }
 
 Write-OK "Application installation and configuration complete."
+
+# 17. TASKBAR CACHE CLEANUP + EXPLORER RESTART
+# ============================================================================
+
+Write-Info "Cleaning taskbar cache..."
+
+$taskbarCache = Join-Path $env:LOCALAPPDATA "Microsoft\Windows\Explorer"
+Get-ChildItem $taskbarCache -Filter "taskbar*.db" -ErrorAction SilentlyContinue |
+    Remove-Item -Force -ErrorAction SilentlyContinue
+
+Write-Info "Restarting Explorer..."
+Get-Process -Name 'explorer' -ErrorAction SilentlyContinue | Stop-Process -Force
+Start-Process explorer.exe
+Write-OK "Explorer restarted."
 
 # 17. TASKBAR CACHE CLEANUP + EXPLORER RESTART
 # ============================================================================
@@ -837,6 +935,7 @@ Write-Host ""
 
 Start-Sleep -Seconds $rebootDelay
 shutdown /r /t 0
+
 
 
 
