@@ -196,6 +196,100 @@ foreach ($key in $privacyKeys) {
     reg add "HKLM\Software\Policies\Microsoft\Windows\AppPrivacy" /v $key /t REG_DWORD /d 2 /f > $null
 }
 
+Write-Host "[INFO] Applying O&O ShutUp10++ Recommended Tweaks..."
+
+# Disable Telemetry
+reg add "HKLM\Software\Policies\Microsoft\Windows\DataCollection" /v AllowTelemetry /t REG_DWORD /d 0 /f > $null
+
+# Disable Feedback Notifications
+reg add "HKLM\Software\Policies\Microsoft\Windows\DataCollection" /v DoNotShowFeedbackNotifications /t REG_DWORD /d 1 /f > $null
+
+# Disable Advertising ID
+reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\AdvertisingInfo" /v Enabled /t REG_DWORD /d 0 /f > $null
+
+# Disable Tailored Experiences
+reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Privacy" /v TailoredExperiencesWithDiagnosticDataEnabled /t REG_DWORD /d 0 /f > $null
+
+# Disable Location Tracking
+reg add "HKLM\Software\Policies\Microsoft\Windows\LocationAndSensors" /v DisableLocation /t REG_DWORD /d 1 /f > $null
+
+reg add "HKLM\Software\Policies\Microsoft\Windows\System" /v EnableActivityFeed /t REG_DWORD /d 0 /f > $null
+reg add "HKLM\Software\Policies\Microsoft\Windows\System" /v PublishUserActivities /t REG_DWORD /d 0 /f > $null
+reg add "HKLM\Software\Policies\Microsoft\Windows\System" /v UploadUserActivities /t REG_DWORD /d 0 /f > $null
+
+$AppPrivacy = "HKLM\Software\Policies\Microsoft\Windows\AppPrivacy"
+
+$permissions = @(
+    "LetAppsAccessCamera",
+    "LetAppsAccessMicrophone",
+    "LetAppsAccessContacts",
+    "LetAppsAccessCalendar",
+    "LetAppsAccessEmail",
+    "LetAppsAccessTasks",
+    "LetAppsAccessPhoneCallHistory",
+    "LetAppsAccessRadios",
+    "LetAppsAccessMotion",
+    "LetAppsAccessFileSystem",
+    "LetAppsAccessPicturesLibrary",
+    "LetAppsAccessVideosLibrary",
+    "LetAppsAccessDocumentsLibrary",
+    "LetAppsAccessUnpairedDevices"
+)
+
+foreach ($perm in $permissions) {
+    reg add $AppPrivacy /v $perm /t REG_DWORD /d 2 /f > $null
+}
+
+# Disable automatic driver updates (O&O Recommended)
+reg add "HKLM\Software\Policies\Microsoft\Windows\WindowsUpdate" /v ExcludeWUDriversInQualityUpdate /t REG_DWORD /d 1 /f > $null
+
+# Disable driver searching through Windows Update
+reg add "HKLM\Software\Policies\Microsoft\Windows\DriverSearching" /v DontSearchWindowsUpdate /t REG_DWORD /d 1 /f > $null
+
+# Disable Delivery Optimization P2P
+reg add "HKLM\Software\Policies\Microsoft\Windows\DeliveryOptimization" /v DODownloadMode /t REG_DWORD /d 0 /f > $null
+
+# Disable SmartScreen for Windows
+reg add "HKLM\Software\Policies\Microsoft\Windows\System" /v EnableSmartScreen /t REG_DWORD /d 0 /f > $null
+
+# Disable SmartScreen for Edge
+reg add "HKLM\Software\Policies\Microsoft\Edge" /v SmartScreenEnabled /t REG_DWORD /d 0 /f > $null
+
+# Disable Cortana
+reg add "HKLM\Software\Policies\Microsoft\Windows\Windows Search" /v AllowCortana /t REG_DWORD /d 0 /f > $null
+
+# Disable Cloud Search
+reg add "HKLM\Software\Policies\Microsoft\Windows\Windows Search" /v AllowCloudSearch /t REG_DWORD /d 0 /f > $null
+
+# Disable Web Search in Start Menu
+reg add "HKLM\Software\Policies\Microsoft\Windows\Windows Search" /v DisableSearch /t REG_DWORD /d 1 /f > $null
+
+# Disable Consumer Experience
+reg add "HKLM\Software\Policies\Microsoft\Windows\CloudContent" /v DisableConsumerFeatures /t REG_DWORD /d 1 /f > $null
+
+# Disable Automatic App Install
+reg add "HKLM\Software\Policies\Microsoft\Windows\CloudContent" /v DisableAutomaticAppInstall /t REG_DWORD /d 1 /f > $null
+
+# Disable Suggestions in Start
+reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager" /v SystemPaneSuggestionsEnabled /t REG_DWORD /d 0 /f > $null
+
+reg add "HKLM\Software\Policies\Microsoft\Windows\OneDrive" /v DisableFileSyncNGSC /t REG_DWORD /d 1 /f > $null
+
+# Disable handwriting data collection
+reg add "HKCU\Software\Microsoft\InputPersonalization" /v RestrictImplicitInkCollection /t REG_DWORD /d 1 /f > $null
+reg add "HKCU\Software\Microsoft\InputPersonalization" /v RestrictImplicitTextCollection /t REG_DWORD /d 1 /f > $null
+
+# Disable background apps
+reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\BackgroundAccessApplications" /v GlobalUserDisabled /t REG_DWORD /d 1 /f > $null
+
+# Disable Cloud Clipboard
+reg add "HKCU\Software\Microsoft\Clipboard" /v CloudClipboard /t REG_DWORD /d 0 /f > $null
+
+# Disable Recent Items & Frequent Folders
+reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer" /v ShowRecent /t REG_DWORD /d 0 /f > $null
+reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer" /v ShowFrequent /t REG_DWORD /d 0 /f > $null
+
+Write-Host "[OK] O&O Recommended Tweaks Applied."
 # 5. WINDOWS UPDATE, DRIVERS, ONEDRIVE, DELIVERY OPTIMIZATION
 # ============================================================================
 
@@ -625,6 +719,7 @@ Write-Host ""
 
 Start-Sleep -Seconds $rebootDelay
 shutdown /r /t 0
+
 
 
 
