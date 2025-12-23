@@ -700,7 +700,7 @@ reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager" 
 
 Write-OK "Extended privacy and anti-advertising hardening applied."
 
-# 16. APPLICATION INSTALLATION (Chrome, 7-Zip, Notepad++) + DEFAULT BROWSER + TASKBAR PIN
+# 16. APPLICATION INSTALLATION (Chrome, 7-Zip, Notepad++) + DEFAULT BROWSER
 # ============================================================================
 
 Write-Info "Checking required applications..."
@@ -746,19 +746,6 @@ Write-Info "Setting Chrome as default browser..."
 Start-Process "$env:ProgramFiles\Google\Chrome\Application\chrome.exe" --make-default-browser
 Write-OK "Chrome set as default browser."
 
-# Pin Chrome to taskbar (Windows 11 supported method)
-Write-Info "Pinning Chrome to taskbar..."
-
-$chromeLnk = "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Google Chrome.lnk"
-$taskbarPath = "$env:APPDATA\Microsoft\Internet Explorer\Quick Launch\User Pinned\TaskBar"
-
-if (Test-Path $chromeLnk) {
-    Copy-Item $chromeLnk $taskbarPath -Force
-    Write-OK "Chrome pinned to taskbar."
-} else {
-    Write-Info "Chrome shortcut not found — skipping taskbar pin."
-}
-
 # -------------------------
 # 7-ZIP
 # -------------------------
@@ -800,20 +787,6 @@ Get-ChildItem $taskbarCache -Filter "taskbar*.db" -ErrorAction SilentlyContinue 
 
 Write-Info "Restarting Explorer..."
 Get-Process -Name 'explorer' -ErrorAction SilentlyContinue | Stop-Process -Force
-Start-Process explorer.exe
-Write-OK "Explorer restarted."
-
-# 17. TASKBAR CACHE CLEANUP + EXPLORER RESTART
-# ============================================================================
-
-Write-Info "Cleaning taskbar cache..."
-
-$taskbarCache = Join-Path $env:LOCALAPPDATA "Microsoft\Windows\Explorer"
-Get-ChildItem $taskbarCache -Filter "taskbar*.db" -ErrorAction SilentlyContinue |
-    Remove-Item -Force -ErrorAction SilentlyContinue
-
-Write-Info "Restarting Explorer..."
-Get-Process -Name 'explorer' -ErrorAction SilentlyContinue | Stop-Process -Force
 
 Write-OK "Explorer restarted."
 
@@ -836,6 +809,7 @@ Write-Host ""
 
 Start-Sleep -Seconds $rebootDelay
 shutdown /r /t 0
+
 
 
 
