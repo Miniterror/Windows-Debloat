@@ -767,31 +767,33 @@ if (-not (Test-AppInstalled "Notepad++")) {
     Write-Info "Installing Notepad++ (silent)..."
 
     $npInstaller = Join-Path $env:TEMP 'npp_installer.exe'
-    $releasePage = "https://github.com/notepad-plus-plus/notepad-plus-plus/releases/latest"
+    $apiUrl = "https://api.github.com/repos/notepad-plus-plus/notepad-plus-plus/releases/latest"
 
     try {
-        Write-Info "Fetching latest Notepad++ release info..."
+        Write-Info "Fetching latest Notepad++ release info from GitHub API..."
 
-        # Get HTML of the release page
-        $html = Invoke-WebRequest -Uri $releasePage -UseBasicParsing -ErrorAction Stop
+        # GitHub API requires a user-agent
+        $headers = @{ "User-Agent" = "Mozilla/5.0" }
 
-        # Find the first .exe installer link
-        $asset = $html.Links |
-            Where-Object { $_.href -match "Installer.*x64.*\.exe$" } |
+        # Fetch JSON release data
+        $release = Invoke-RestMethod -Uri $apiUrl -Headers $headers -ErrorAction Stop
+
+        # Find the correct installer asset
+        $asset = $release.assets |
+            Where-Object { $_.name -match "Installer.*x64.*\.exe$" } |
             Select-Object -First 1
 
         if (-not $asset) {
-            throw "Could not locate Notepad++ installer link on GitHub."
+            throw "Could not locate Notepad++ installer in GitHub API response."
         }
 
-        # Build full download URL
-        $nppUrl = "https://github.com$($asset.href)"
-
+        $nppUrl = $asset.browser_download_url
         Write-Info "Downloading Notepad++ from: $nppUrl"
 
-        # Use BITS for reliable download
+        # Download via BITS (very reliable)
         Start-BitsTransfer -Source $nppUrl -Destination $npInstaller -ErrorAction Stop
 
+        # Silent install
         Start-Process -FilePath $npInstaller -ArgumentList "/S" -Wait -ErrorAction Stop
         Write-OK "Notepad++ installed."
     }
@@ -804,34 +806,24 @@ else {
 }
 
 # -------------------------
-# DISCORD (auto-detect latest installer)
+# DISCORD
 # -------------------------
 
 if (-not (Test-AppInstalled "Discord")) {
     Write-Info "Installing Discord (silent)..."
 
     $discordInstaller = Join-Path $env:TEMP 'discord_installer.exe'
-    $manifestUrl = "https://discord.com/api/downloads/distributions/app/manifests/latest?platform=win&arch=x86"
+    $discordUrl = "https://dl.discordapp.net/apps/win/0.0.309/DiscordSetup.exe"
 
     try {
-        Write-Info "Fetching Discord manifest..."
+        Write-Info "Downloading Discord installer..."
 
-        # Get JSON manifest
-        $manifest = Invoke-RestMethod -Uri $manifestUrl -ErrorAction Stop
+        # Force TLS 1.2 and spoof browser agent
+        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+        $headers = @{ "User-Agent" = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" }
 
-        # Extract the correct installer URL
-        $discordUrl = $manifest.full_installer.download_url
+        Invoke-WebRequest -Uri $discordUrl -OutFile $discordInstaller -Headers $headers -ErrorAction Stop
 
-        if (-not $discordUrl) {
-            throw "Could not locate Discord installer URL in manifest."
-        }
-
-        Write-Info "Downloading Discord from: $discordUrl"
-
-        # Download via BITS (very reliable)
-        Start-BitsTransfer -Source $discordUrl -Destination $discordInstaller -ErrorAction Stop
-
-        # Silent install
         Start-Process -FilePath $discordInstaller -ArgumentList "/S" -Wait -ErrorAction Stop
         Write-OK "Discord installed."
     }
@@ -957,6 +949,7 @@ Write-Host ""
 
 Start-Sleep -Seconds $rebootDelay
 shutdown /r /t 0
+
 
 
 
