@@ -86,7 +86,7 @@ $allAppxSelectors = @(
     "MicrosoftCorporationII.MicrosoftFamily","Microsoft.MicrosoftOfficeHub",
     "Microsoft.Office.OneNote","Microsoft.People","Microsoft.SkypeApp",
     "MicrosoftTeams","MSTeams","Microsoft.Wallet","Microsoft.YourPhone",
-    "*Clipchamp*"
+    "*Clipchamp*","MicrosoftWindows.Client.CBS*"
 )
 
 Remove-AppPackagesSelectors -Selectors $allAppxSelectors
@@ -616,28 +616,7 @@ reg delete "HKCU\Software\Microsoft\Windows\CurrentVersion\Run" /v OneDrive /f 2
 # (optioneel) OneDrive uit de Explorer navigatieboom
 reg add "HKCR\CLSID\{018D5C66-4533-4307-9B53-224DE2ED1FE6}" /v System.IsPinnedToNameSpaceTree /t REG_DWORD /d 0 /f 2>$null
 
-# 14. REMOVE GET STARTED (CLIENT.CBS)
-# ============================================================================
-
-Write-Info "Removing Get Started (Client.CBS & Client.Core)..."
-
-$clientApps = @(
-    "C:\Windows\SystemApps\MicrosoftWindows.Client.CBS_cw5n1h2txyewy",
-    "C:\Windows\SystemApps\MicrosoftWindows.Client.Core_cw5n1h2txyewy"
-)
-
-foreach ($app in $clientApps) {
-    if (Test-Path $app) {
-        takeown /F $app /R /D Y | Out-Null
-        icacls $app /grant administrators:F /T | Out-Null
-        Remove-Item $app -Recurse -Force -ErrorAction SilentlyContinue
-        Write-Remove "Removed: $app"
-    } else {
-        Write-Info "Not found: $app"
-    }
-}
-
-# 15. EXTENDED PRIVACY / ANTI-AD / ANTI-CLOUD / ANTI-SPOTLIGHT / ANTI-RECALL
+# 14. EXTENDED PRIVACY / ANTI-AD / ANTI-CLOUD / ANTI-SPOTLIGHT / ANTI-RECALL
 # ============================================================================
 
 Write-Info "Applying extended privacy and anti-advertising hardening..."
@@ -693,7 +672,7 @@ reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager" 
 
 Write-OK "Extended privacy and anti-advertising hardening applied."
 
-# 17. TASKBAR CACHE CLEANUP + EXPLORER RESTART
+# 16. TASKBAR CACHE CLEANUP + EXPLORER RESTART
 # ============================================================================
 Write-Host "Cleaning taskbar cache..."
 
@@ -744,7 +723,7 @@ try {
     Write-Error "Taskbar cleanup failed: $($_.Exception.Message)"
 }
 
-# 18. AUTOMATIC REBOOT WITH BANNER
+# 17. AUTOMATIC REBOOT WITH BANNER
 # ============================================================================
 
 $rebootDelay = 15
@@ -762,6 +741,7 @@ Write-Host ""
 
 Start-Sleep -Seconds $rebootDelay
 shutdown /r /t 0
+
 
 
 
