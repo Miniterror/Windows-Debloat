@@ -289,6 +289,30 @@ foreach ($file in $layoutFiles) {
 # Taskbar layout laten rebuilden
 reg delete "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Taskband" /f 2>$null
 
+Write-Info "Applying additional performance, privacy and Explorer tweaks..."
+
+# Disable SysMain (Superfetch) – improves SSD performance
+Write-Info "Disabling SysMain service..."
+Stop-Service SysMain -Force -ErrorAction SilentlyContinue
+Set-Service SysMain -StartupType Disabled
+
+# Disable Diagnostics Tracking service (DiagTrack)
+Write-Info "Disabling Diagnostics Tracking service..."
+Stop-Service DiagTrack -Force -ErrorAction SilentlyContinue
+Set-Service DiagTrack -StartupType Disabled
+
+# Disable 'Recent files' and 'Frequent folders' in Explorer
+Write-Info "Disabling recent/frequent items in Explorer..."
+reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer" /v ShowRecent /t REG_DWORD /d 0 /f
+reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer" /v ShowFrequent /t REG_DWORD /d 0 /f
+
+# Disable 'Recently added apps' in Start menu
+Write-Info "Disabling recently added apps in Start..."
+reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" /v Start_NotifyNewApps /t REG_DWORD /d 0 /f
+
+# Disable SMBv1 (legacy, insecure protocol)
+Write-Info "Disabling SMBv1 protocol..."
+Disable-WindowsOptionalFeature -Online -FeatureName SMB1Protocol -NoRestart -ErrorAction SilentlyContinue
 
 # 7. VBS / CORE ISOLATION / SVCHOST SPLIT
 # ============================================================================
@@ -604,3 +628,4 @@ Write-Host ""
 
 Start-Sleep -Seconds $rebootDelay
 shutdown /r /t 0
+
