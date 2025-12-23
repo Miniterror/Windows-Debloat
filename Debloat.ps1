@@ -873,16 +873,24 @@ try {
         Write-Host "Taskbar cache folder not found: $taskbarCache"
     }
 
-    # Start Explorer and verify
-    Write-Host "Starting Explorer..."
-    Start-Process -FilePath "explorer.exe"
-    Start-Sleep -Seconds 2
+    # Silent Explorer restart
+    Write-Host "Restarting Explorer silently..."
 
+    # Kill any remaining Explorer processes
+    Get-Process explorer -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+    Start-Sleep -Milliseconds 500
+
+    # Restart Explorer WITHOUT opening a window
+    Start-Process explorer.exe -WindowStyle Hidden
+
+    # Verify Explorer is running
+    Start-Sleep -Seconds 2
     if (Get-Process -Name explorer -ErrorAction SilentlyContinue) {
-        Write-Host "Explorer restarted successfully."
+        Write-Host "Explorer restarted successfully (silent)."
     } else {
         Write-Error "Explorer did not start. Check shell registry and user context."
     }
+
 } catch {
     Write-Error "Taskbar cleanup failed: $($_.Exception.Message)"
 }
@@ -905,6 +913,7 @@ Write-Host ""
 
 Start-Sleep -Seconds $rebootDelay
 shutdown /r /t 0
+
 
 
 
