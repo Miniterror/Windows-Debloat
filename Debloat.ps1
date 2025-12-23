@@ -86,11 +86,10 @@ $allAppxSelectors = @(
     "MicrosoftCorporationII.MicrosoftFamily","Microsoft.MicrosoftOfficeHub",
     "Microsoft.Office.OneNote","Microsoft.People","Microsoft.SkypeApp",
     "MicrosoftTeams","MSTeams","Microsoft.Wallet","Microsoft.YourPhone",
-    "*Clipchamp*","MicrosoftWindows.Client.CBS*"
+    "*Clipchamp*"
 )
 
 Remove-AppPackagesSelectors -Selectors $allAppxSelectors
-
 
 # 3. WINDOWS CAPABILITIES & OPTIONAL FEATURES
 # ============================================================================
@@ -130,7 +129,6 @@ foreach ($selector in $features) {
             Disable-WindowsOptionalFeature -Online -FeatureName $_.FeatureName -Remove -NoRestart -ErrorAction Continue
         }
 }
-
 
 # 4. PRIVACY, TELEMETRY, DIAGNOSTICS, CONTENT DELIVERY
 # ============================================================================
@@ -670,6 +668,12 @@ reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager" 
 reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager" /v PreInstalledAppsEnabled /t REG_DWORD /d 0 /f > $null
 reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager" /v PreInstalledAppsEverEnabled /t REG_DWORD /d 0 /f > $null
 
+# Disable Get Started / Privacy Experience
+reg add "HKLM\Software\Policies\Microsoft\Windows\OOBE" /v DisablePrivacyExperience /t REG_DWORD /d 1 /f > $null
+
+# Suggested apps in Start (25H2)
+reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" /v Start_IrisRecommendations /t REG_DWORD /d 0 /f > $null
+
 Write-OK "Extended privacy and anti-advertising hardening applied."
 
 # 16. TASKBAR CACHE CLEANUP + EXPLORER RESTART
@@ -741,6 +745,7 @@ Write-Host ""
 
 Start-Sleep -Seconds $rebootDelay
 shutdown /r /t 0
+
 
 
 
