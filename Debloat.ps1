@@ -1,3 +1,35 @@
+# Ensure the script is running as Administrator — if not, relaunch elevated and exit the current process.
+try {
+    $isAdmin = (New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+} catch {
+    $isAdmin = $false
+}
+
+if (-not $isAdmin) {
+    Write-Host "[WARN]  This script is not running as Administrator. Attempting to restart elevated..." -ForegroundColor Yellow
+
+    # Determine script path (works in console and when invoked from other hosts)
+    $scriptPath = $PSCommandPath
+    if (-not $scriptPath) { $scriptPath = $MyInvocation.MyCommand.Definition }
+
+    if (-not (Test-Path $scriptPath)) {
+        Write-Host "[ERROR]  Cannot determine script path to relaunch elevated." -ForegroundColor Red
+        exit 1
+    }
+
+    $argList = "-NoProfile -ExecutionPolicy Bypass -File `"$scriptPath`""
+
+    try {
+        Start-Process -FilePath "powershell.exe" -ArgumentList $argList -Verb RunAs
+    } catch {
+        Write-Host "[ERROR]  Failed to relaunch script with elevated privileges: $_" -ForegroundColor Red
+        exit 1
+    }
+
+    # Exit the non-elevated process after spawning the elevated one
+    exit
+}
+
 function Write-Info($msg)    { Write-Host "[INFO]  $msg" -ForegroundColor Cyan }
 function Write-OK($msg)      { Write-Host "[ OK ]  $msg" -ForegroundColor Green }
 function Write-Remove($msg)  { Write-Host "[DEL]  $msg" -ForegroundColor Magenta }
