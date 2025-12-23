@@ -767,41 +767,79 @@ if (-not (Test-AppInstalled "Notepad++")) {
     Write-Info "Installing Notepad++ (silent)..."
 
     $npInstaller = Join-Path $env:TEMP 'npp_installer.exe'
-    $nppUrl = "https://github.com/notepad-plus-plus/notepad-plus-plus/releases/latest/download/npp.64-bit.Installer.exe"
+    $releasePage = "https://github.com/notepad-plus-plus/notepad-plus-plus/releases/latest"
 
     try {
-        Write-Info "Downloading Notepad++ via BITS..."
+        Write-Info "Fetching latest Notepad++ release info..."
+
+        # Get HTML of the release page
+        $html = Invoke-WebRequest -Uri $releasePage -UseBasicParsing -ErrorAction Stop
+
+        # Find the first .exe installer link
+        $asset = $html.Links |
+            Where-Object { $_.href -match "Installer.*x64.*\.exe$" } |
+            Select-Object -First 1
+
+        if (-not $asset) {
+            throw "Could not locate Notepad++ installer link on GitHub."
+        }
+
+        # Build full download URL
+        $nppUrl = "https://github.com$($asset.href)"
+
+        Write-Info "Downloading Notepad++ from: $nppUrl"
+
+        # Use BITS for reliable download
         Start-BitsTransfer -Source $nppUrl -Destination $npInstaller -ErrorAction Stop
 
         Start-Process -FilePath $npInstaller -ArgumentList "/S" -Wait -ErrorAction Stop
         Write-OK "Notepad++ installed."
-    } catch {
+    }
+    catch {
         Write-Err "Failed to install Notepad++: $($_.Exception.Message)"
     }
-} else {
+}
+else {
     Write-Info "Notepad++ already installed — skipping."
 }
 
 # -------------------------
-# DISCORD
+# DISCORD (auto-detect latest installer)
 # -------------------------
 
 if (-not (Test-AppInstalled "Discord")) {
     Write-Info "Installing Discord (silent)..."
 
     $discordInstaller = Join-Path $env:TEMP 'discord_installer.exe'
-    $discordUrl = "https://discord.com/api/download?platform=win&format=exe"
+    $manifestUrl = "https://discord.com/api/downloads/distributions/app/manifests/latest?platform=win&arch=x86"
 
     try {
-        Write-Info "Downloading Discord via BITS..."
+        Write-Info "Fetching Discord manifest..."
+
+        # Get JSON manifest
+        $manifest = Invoke-RestMethod -Uri $manifestUrl -ErrorAction Stop
+
+        # Extract the correct installer URL
+        $discordUrl = $manifest.full_installer.download_url
+
+        if (-not $discordUrl) {
+            throw "Could not locate Discord installer URL in manifest."
+        }
+
+        Write-Info "Downloading Discord from: $discordUrl"
+
+        # Download via BITS (very reliable)
         Start-BitsTransfer -Source $discordUrl -Destination $discordInstaller -ErrorAction Stop
 
+        # Silent install
         Start-Process -FilePath $discordInstaller -ArgumentList "/S" -Wait -ErrorAction Stop
         Write-OK "Discord installed."
-    } catch {
+    }
+    catch {
         Write-Err "Failed to install Discord: $($_.Exception.Message)"
     }
-} else {
+}
+else {
     Write-Info "Discord already installed — skipping."
 }
 
@@ -919,6 +957,7 @@ Write-Host ""
 
 Start-Sleep -Seconds $rebootDelay
 shutdown /r /t 0
+
 
 
 
