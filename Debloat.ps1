@@ -681,12 +681,6 @@ Write-OK "Extended privacy and anti-advertising hardening applied."
 
 # 15. APPLICATION INSTALLATION (Chrome, 7-Zip, Notepad++) + DEFAULT BROWSER
 # ============================================================================
-# Safer, fixed version:
-# - Fixes temp path escaping (uses Join-Path)
-# - Improves Test-AppInstalled to check HKLM/HKLM Wow6432Node and HKCU
-# - Verifies downloads before running installers
-# - Uses Start-Process -FilePath and explicit ArgumentList
-# - Adds basic error handling and informative output
 
 function Write-Info { param($m) Write-Host "[INFO]  $m" -ForegroundColor Cyan }
 function Write-OK   { param($m) Write-Host "[OK]    $m" -ForegroundColor Green }
@@ -909,4 +903,5 @@ Write-Host ""
 
 Start-Sleep -Seconds $rebootDelay
 shutdown /r /t 0
+
 
