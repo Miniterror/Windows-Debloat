@@ -427,18 +427,88 @@ reg add "HKLM\System\CurrentControlSet\Control\DeviceGuard\Scenarios\HypervisorE
 Write-Info "Applying SvcHostSplitThresholdInKB..."
 reg add "HKLM\SYSTEM\CurrentControlSet\Control" /v SvcHostSplitThresholdInKB /t REG_DWORD /d 67108864 /f > $null
 
-
 # 8. LOCALE, TIMEZONE, LANGUAGE
 # ============================================================================
 
-Write-Info "Setting locale/timezone to NL / W. Europe..."
+Write-Info "Windows Region & Language Configuration"
 
-tzutil /s "W. Europe Standard Time"
-Set-WinSystemLocale nl-NL
-Set-WinUserLanguageList nl-NL -Force
-Set-Culture nl-NL
-Set-WinHomeLocation -GeoId 176  # Nederland
+# -------------------------
+# Helper: Menu Selection
+# -------------------------
+function Show-Menu {
+    param(
+        [string]$Title,
+        [array]$Options
+    )
 
+    Write-Host ""
+    Write-Host "=== $Title ==="
+    for ($i = 0; $i -lt $Options.Count; $i++) {
+        Write-Host "[$($i+1)] $($Options[$i])"
+    }
+
+    do {
+        $choice = Read-Host "Choose an option (1-$($Options.Count))"
+    } until ($choice -match "^[1-$($Options.Count)]$")
+
+    return $Options[$choice - 1]
+}
+
+# -------------------------
+# TIMEZONE SELECTION
+# -------------------------
+
+$timezones = @(
+    "W. Europe Standard Time (NL, BE, DE, FR)",
+    "GMT Standard Time (UK, IE)",
+    "Romance Standard Time (FR, ES)",
+    "Pacific Standard Time (US West Coast)",
+    "Eastern Standard Time (US East Coast)"
+)
+
+$tzChoice = Show-Menu "Select your Timezone" $timezones
+
+switch -Wildcard ($tzChoice) {
+    "*W. Europe*" { $tz = "W. Europe Standard Time" }
+    "*GMT*"       { $tz = "GMT Standard Time" }
+    "*Romance*"   { $tz = "Romance Standard Time" }
+    "*Pacific*"   { $tz = "Pacific Standard Time" }
+    "*Eastern*"   { $tz = "Eastern Standard Time" }
+}
+
+Write-Info "Setting timezone to $tz..."
+tzutil /s "$tz"
+
+# -------------------------
+# LANGUAGE / LOCALE SELECTION
+# -------------------------
+
+$languages = @(
+    "Dutch (nl-NL)",
+    "English US (en-US)",
+    "English UK (en-GB)",
+    "German (de-DE)",
+    "French (fr-FR)"
+)
+
+$langChoice = Show-Menu "Select your Language & Locale" $languages
+
+switch -Wildcard ($langChoice) {
+    "*Dutch*"   { $lang = "nl-NL"; $geo = 176 }
+    "*US*"      { $lang = "en-US"; $geo = 244 }
+    "*UK*"      { $lang = "en-GB"; $geo = 242 }
+    "*German*"  { $lang = "de-DE"; $geo = 94 }
+    "*French*"  { $lang = "fr-FR"; $geo = 84 }
+}
+
+Write-Info "Applying language/locale: $lang"
+
+Set-WinSystemLocale $lang
+Set-WinUserLanguageList $lang -Force
+Set-Culture $lang
+Set-WinHomeLocation -GeoId $geo
+
+Write-OK "Locale, language, and timezone configuration complete."
 
 # 9. THEME / ACCENT COLOR
 # ============================================================================
@@ -916,3 +986,4 @@ Write-Host ""
 
 Start-Sleep -Seconds $rebootDelay
 shutdown /r /t 0
+
