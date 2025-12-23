@@ -695,50 +695,54 @@ Write-OK "Extended privacy and anti-advertising hardening applied."
 
 # 17. TASKBAR CACHE CLEANUP + EXPLORER RESTART
 # ============================================================================
-Write-Info "Cleaning taskbar cache..."
+Write-Host "Cleaning taskbar cache..."
 
 $taskbarCache = Join-Path $env:LOCALAPPDATA "Microsoft\Windows\Explorer"
 
 try {
-    # Stop explorer gracefully, then force if needed
+    # Stop explorer if running
     $expl = Get-Process -Name explorer -ErrorAction SilentlyContinue
     if ($expl) {
-        Write-Info "Stopping Explorer..."
+        Write-Host "Stopping Explorer..."
         $expl | Stop-Process -Force -ErrorAction Stop
-        # Wait for explorer to exit
+
+        # Wait for explorer to exit (timeout in seconds)
         $timeout = 10
         $sw = [Diagnostics.Stopwatch]::StartNew()
-        while (Get-Process -Name explorer -ErrorAction SilentlyContinue -EA SilentlyContinue -ne $null -and $sw.Elapsed.TotalSeconds -lt $timeout) {
+        while ((Get-Process -Name explorer -ErrorAction SilentlyContinue) -ne $null -and $sw.Elapsed.TotalSeconds -lt $timeout) {
             Start-Sleep -Milliseconds 250
         }
     }
 
-    # Remove taskbar cache files (only those that exist)
-    Write-Info "Removing taskbar cache files from $taskbarCache"
-    Get-ChildItem -Path $taskbarCache -Filter "taskbar*.db" -File -ErrorAction SilentlyContinue |
-        ForEach-Object {
-            try {
-                Remove-Item -LiteralPath $_.FullName -Force -ErrorAction Stop
-                Write-Info "Removed $($_.Name)"
-            } catch {
-                Write-Warning "Could not remove $($_.Name): $($_.Exception.Message)"
+    # Remove taskbar cache files if folder exists
+    if (Test-Path -Path $taskbarCache) {
+        Write-Host "Removing taskbar cache files from $taskbarCache"
+        Get-ChildItem -Path $taskbarCache -Filter "taskbar*.db" -File -ErrorAction SilentlyContinue |
+            ForEach-Object {
+                try {
+                    Remove-Item -LiteralPath $_.FullName -Force -ErrorAction Stop
+                    Write-Host "Removed $($_.Name)"
+                } catch {
+                    Write-Warning "Could not remove $($_.Name): $($_.Exception.Message)"
+                }
             }
-        }
+    } else {
+        Write-Host "Taskbar cache folder not found: $taskbarCache"
+    }
 
     # Start Explorer and verify
-    Write-Info "Starting Explorer..."
+    Write-Host "Starting Explorer..."
     Start-Process -FilePath "explorer.exe"
     Start-Sleep -Seconds 2
+
     if (Get-Process -Name explorer -ErrorAction SilentlyContinue) {
-        Write-OK "Explorer restarted successfully."
+        Write-Host "Explorer restarted successfully."
     } else {
         Write-Error "Explorer did not start. Check shell registry and user context."
     }
 } catch {
     Write-Error "Taskbar cleanup failed: $($_.Exception.Message)"
 }
-
-
 
 # 18. AUTOMATIC REBOOT WITH BANNER
 # ============================================================================
@@ -758,6 +762,7 @@ Write-Host ""
 
 Start-Sleep -Seconds $rebootDelay
 shutdown /r /t 0
+
 
 
 
