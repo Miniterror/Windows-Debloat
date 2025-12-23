@@ -7,6 +7,9 @@ $IsAdmin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIde
 
 if (-not $IsAdmin) {
     Write-Host "[ERROR] Run this script as Administrator." -ForegroundColor Red
+    Write-Host ""
+    Write-Host "This window will close in 10 seconds..." -ForegroundColor Yellow
+    Start-Sleep -Seconds 10
     exit 1
 }
 
@@ -676,6 +679,160 @@ reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" /v St
 
 Write-OK "Extended privacy and anti-advertising hardening applied."
 
+# 15. APPLICATION INSTALLATION (Chrome, 7-Zip, Notepad++) + DEFAULT BROWSER
+# ============================================================================
+# Safer, fixed version:
+# - Fixes temp path escaping (uses Join-Path)
+# - Improves Test-AppInstalled to check HKLM/HKLM Wow6432Node and HKCU
+# - Verifies downloads before running installers
+# - Uses Start-Process -FilePath and explicit ArgumentList
+# - Adds basic error handling and informative output
+
+function Write-Info { param($m) Write-Host "[INFO]  $m" -ForegroundColor Cyan }
+function Write-OK   { param($m) Write-Host "[OK]    $m" -ForegroundColor Green }
+function Write-Warn { param($m) Write-Host "[WARN]  $m" -ForegroundColor Yellow }
+function Write-Err  { param($m) Write-Host "[ERROR] $m" -ForegroundColor Red }
+
+Write-Info "Checking required applications..."
+
+# Helper: Check if an app exists in uninstall registry (HKLM 64/32-bit and HKCU)
+function Test-AppInstalled {
+    param([string]$Name)
+
+    $paths = @(
+        "HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*",
+        "HKLM:\Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*",
+        "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*"
+    )
+
+    foreach ($path in $paths) {
+        try {
+            Get-ItemProperty -Path $path -ErrorAction SilentlyContinue |
+                ForEach-Object {
+                    if ($_.DisplayName -and ($_.DisplayName -like "*$Name*")) {
+                        return $true
+                    }
+                }
+        } catch {
+            # ignore inaccessible keys
+        }
+    }
+    return $false
+}
+
+# -------------------------
+# GOOGLE CHROME
+# -------------------------
+$chromeInstalled = Test-AppInstalled "Google Chrome"
+
+if (-not $chromeInstalled) {
+    Write-Info "Installing Google Chrome (silent)..."
+    $chromeInstaller = Join-Path $env:TEMP 'chrome_installer.exe'
+    try {
+        Invoke-WebRequest -Uri "https://dl.google.com/chrome/install/latest/chrome_installer.exe" -OutFile $chromeInstaller -UseBasicParsing -ErrorAction Stop
+        if (-not (Test-Path -Path $chromeInstaller)) { throw "Download failed: $chromeInstaller not found." }
+        Start-Process -FilePath $chromeInstaller -ArgumentList "/silent","/install" -Wait -ErrorAction Stop
+        Write-OK "Google Chrome installed."
+
+        # Set Chrome as default ONLY if it was installed now
+        Write-Info "Setting Chrome as default browser..."
+        $chromeExe = Join-Path $env:ProgramFiles 'Google\Chrome\Application\chrome.exe'
+        if (Test-Path -Path $chromeExe) {
+            Start-Process -FilePath $chromeExe -ArgumentList '--make-default-browser'
+            Write-OK "Chrome set as default browser."
+        } else {
+            Write-Warn "Chrome executable not found after installation."
+        }
+
+    } catch {
+        Write-Err "Failed to install Google Chrome: $($_.Exception.Message)"
+    }
+} else {
+    Write-Info "Google Chrome already installed — skipping installation and default-browser setup."
+}
+
+# -------------------------
+# 7-ZIP
+# -------------------------
+if (-not (Test-AppInstalled "7-Zip")) {
+    Write-Info "Installing 7-Zip (silent)..."
+    $zipInstaller = Join-Path $env:TEMP '7zip_installer.exe'
+    try {
+        Invoke-WebRequest -Uri "https://www.7-zip.org/a/7z2408-x64.exe" -OutFile $zipInstaller -UseBasicParsing -ErrorAction Stop
+        if (-not (Test-Path -Path $zipInstaller)) { throw "Download failed: $zipInstaller not found." }
+        Start-Process -FilePath $zipInstaller -ArgumentList "/S" -Wait -ErrorAction Stop
+        Write-OK "7-Zip installed."
+    } catch {
+        Write-Err "Failed to install 7-Zip: $($_.Exception.Message)"
+    }
+} else {
+    Write-Info "7-Zip already installed — skipping."
+}
+
+# -------------------------
+# NOTEPAD++
+# -------------------------
+if (-not (Test-AppInstalled "Notepad++")) {
+    Write-Info "Installing Notepad++ (silent)..."
+    $npInstaller = Join-Path $env:TEMP 'npp_installer.exe'
+
+    # Always-working URL for latest 64-bit installer
+    $nppUrl = "https://github.com/notepad-plus-plus/notepad-plus-plus/releases/latest/download/npp.Installer.x64.exe"
+
+    try {
+        Invoke-WebRequest -Uri $nppUrl -OutFile $npInstaller -UseBasicParsing -ErrorAction Stop
+        if (-not (Test-Path -Path $npInstaller)) { throw "Download failed: $npInstaller not found." }
+        Start-Process -FilePath $npInstaller -ArgumentList "/S" -Wait -ErrorAction Stop
+        Write-OK "Notepad++ installed."
+    } catch {
+        Write-Err "Failed to install Notepad++: $($_.Exception.Message)"
+    }
+} else {
+    Write-Info "Notepad++ already installed — skipping."
+}
+
+# -------------------------
+# DISCORD
+# -------------------------
+if (-not (Test-AppInstalled "Discord")) {
+    Write-Info "Installing Discord (silent)..."
+    $discordInstaller = Join-Path $env:TEMP 'discord_installer.exe'
+    $discordUrl = "https://discord.com/api/download?platform=win&format=exe"
+
+    try {
+        Invoke-WebRequest -Uri $discordUrl -OutFile $discordInstaller -UseBasicParsing -ErrorAction Stop
+        if (-not (Test-Path -Path $discordInstaller)) { throw "Download failed: $discordInstaller not found." }
+        Start-Process -FilePath $discordInstaller -ArgumentList "/S" -Wait -ErrorAction Stop
+        Write-OK "Discord installed."
+    } catch {
+        Write-Err "Failed to install Discord: $($_.Exception.Message)"
+    }
+} else {
+    Write-Info "Discord already installed — skipping."
+}
+
+# -------------------------
+# STEAM
+# -------------------------
+if (-not (Test-AppInstalled "Steam")) {
+    Write-Info "Installing Steam (silent)..."
+    $steamInstaller = Join-Path $env:TEMP 'steam_installer.exe'
+    $steamUrl = "https://cdn.cloudflare.steamstatic.com/client/installer/SteamSetup.exe"
+
+    try {
+        Invoke-WebRequest -Uri $steamUrl -OutFile $steamInstaller -UseBasicParsing -ErrorAction Stop
+        if (-not (Test-Path -Path $steamInstaller)) { throw "Download failed: $steamInstaller not found." }
+        Start-Process -FilePath $steamInstaller -ArgumentList "/S" -Wait -ErrorAction Stop
+        Write-OK "Steam installed."
+    } catch {
+        Write-Err "Failed to install Steam: $($_.Exception.Message)"
+    }
+} else {
+    Write-Info "Steam already installed — skipping."
+}
+
+Write-OK "Application installation and configuration complete."
+
 # 16. TASKBAR CACHE CLEANUP + EXPLORER RESTART
 # ============================================================================
 Write-Host "Cleaning taskbar cache..."
@@ -745,14 +902,3 @@ Write-Host ""
 
 Start-Sleep -Seconds $rebootDelay
 shutdown /r /t 0
-
-
-
-
-
-
-
-
-
-
-
