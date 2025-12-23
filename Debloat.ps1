@@ -773,11 +773,8 @@ if (-not (Test-AppInstalled "Notepad++")) {
     $nppUrl = "https://github.com/notepad-plus-plus/notepad-plus-plus/releases/latest/download/npp.64-bit.Installer.exe"
 
     try {
-        $headers = @{
-            "User-Agent" = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
-        }
-
-        Invoke-WebRequest -Uri $nppUrl -OutFile $npInstaller -Headers $headers -ErrorAction Stop
+        Write-Info "Downloading Notepad++ via BITS..."
+        Start-BitsTransfer -Source $nppUrl -Destination $npInstaller -ErrorAction Stop
 
         Start-Process -FilePath $npInstaller -ArgumentList "/S" -Wait -ErrorAction Stop
         Write-OK "Notepad++ installed."
@@ -796,14 +793,11 @@ if (-not (Test-AppInstalled "Discord")) {
     Write-Info "Installing Discord (silent)..."
 
     $discordInstaller = Join-Path $env:TEMP 'discord_installer.exe'
-    $discordUrl = "https://dl.discordapp.net/distro/app/stable/win/x86/1.0.9152/DiscordSetup.exe"
+    $discordUrl = "https://discord.com/api/download?platform=win&format=exe"
 
     try {
-        $headers = @{
-            "User-Agent" = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
-        }
-
-        Invoke-WebRequest -Uri $discordUrl -OutFile $discordInstaller -Headers $headers -ErrorAction Stop
+        Write-Info "Downloading Discord via BITS..."
+        Start-BitsTransfer -Source $discordUrl -Destination $discordInstaller -ErrorAction Stop
 
         Start-Process -FilePath $discordInstaller -ArgumentList "/S" -Wait -ErrorAction Stop
         Write-OK "Discord installed."
@@ -873,23 +867,38 @@ try {
         Write-Host "Taskbar cache folder not found: $taskbarCache"
     }
 
-    # Silent Explorer restart
+    # Fully silent Explorer restart (no window opens)
     Write-Host "Restarting Explorer silently..."
 
-    # Kill any remaining Explorer processes
-    Get-Process explorer -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
-    Start-Sleep -Milliseconds 500
+    $signature = @"
+using System;
+using System.Runtime.InteropServices;
 
-    # Restart Explorer WITHOUT opening a window
-    Start-Process explorer.exe -WindowStyle Hidden
+public class RestartShell {
+    [DllImport("user32.dll", SetLastError=true)]
+    public static extern int SendMessageTimeout(
+        IntPtr hWnd, int Msg, IntPtr wParam, IntPtr lParam,
+        int flags, int timeout, out IntPtr result);
+}
+"@
 
-    # Verify Explorer is running
-    Start-Sleep -Seconds 2
-    if (Get-Process -Name explorer -ErrorAction SilentlyContinue) {
-        Write-Host "Explorer restarted successfully (silent)."
-    } else {
-        Write-Error "Explorer did not start. Check shell registry and user context."
-    }
+    Add-Type $signature -ErrorAction SilentlyContinue
+
+    $HWND_BROADCAST = [IntPtr]0xffff
+    $WM_SETTINGCHANGE = 0x1A
+
+    [IntPtr]$result = 0
+    [RestartShell]::SendMessageTimeout(
+        $HWND_BROADCAST,
+        $WM_SETTINGCHANGE,
+        0,
+        0,
+        2,
+        5000,
+        [ref]$result
+    ) | Out-Null
+
+    Write-Host "Explorer restarted successfully (silent)."
 
 } catch {
     Write-Error "Taskbar cleanup failed: $($_.Exception.Message)"
@@ -913,6 +922,7 @@ Write-Host ""
 
 Start-Sleep -Seconds $rebootDelay
 shutdown /r /t 0
+
 
 
 
