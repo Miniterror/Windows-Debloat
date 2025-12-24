@@ -931,8 +931,8 @@ if (-not (Test-AppInstalled "Steam")) {
         Write-Info "Installing Steam (silent)..."
         $steamInstaller = Join-Path $env:TEMP 'steam_installer.exe'
         $steam
-{
-
+}
+}
 # 16. TASKBAR CACHE CLEANUP + EXPLORER RESTART
 # ============================================================================
 Write-Host "Cleaning taskbar cache..."
@@ -1025,4 +1025,5 @@ Write-Host ""
 
 Start-Sleep -Seconds $rebootDelay
 shutdown /r /t 0
+
 
