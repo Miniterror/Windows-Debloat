@@ -874,38 +874,45 @@ $zipPath  = "$env:TEMP\platform-tools.zip"
 $tempPath = "$env:TEMP\platform-tools-temp"
 $destPath = "C:\ADB"
 
-try {
-    # Download the ZIP
-    Invoke-WebRequest -Uri $adbUrl -OutFile $zipPath -UseBasicParsing
-    Write-Host "Downloaded ADB package to $zipPath"
+# Check if ADB is already installed
+if (Test-Path $destPath) {
+    Write-Host "ADB directory already exists at $destPath. Skipping download and installation."
+} else {
+    try {
+        # Download the ZIP
+        Invoke-WebRequest -Uri $adbUrl -OutFile $zipPath -UseBasicParsing
+        Write-Host "Downloaded ADB package to $zipPath"
 
-    # Ensure temp and destination folders exist
-    if (Test-Path $tempPath) { Remove-Item $tempPath -Recurse -Force }
-    if (-not (Test-Path $destPath)) { New-Item -ItemType Directory -Path $destPath | Out-Null }
+        # Ensure temp folder is clean
+        if (Test-Path $tempPath) { Remove-Item $tempPath -Recurse -Force }
 
-    # Extract the ZIP into temp
-    Expand-Archive -Path $zipPath -DestinationPath $tempPath -Force
-    Write-Host "Extracted ADB tools to $tempPath"
+        # Create destination folder
+        New-Item -ItemType Directory -Path $destPath | Out-Null
 
-    # Move contents of inner 'platform-tools' folder into C:\ADB
-    Move-Item -Path "$tempPath\platform-tools\*" -Destination $destPath -Force
-    Write-Host "Moved ADB files to $destPath"
+        # Extract the ZIP into temp
+        Expand-Archive -Path $zipPath -DestinationPath $tempPath -Force
+        Write-Host "Extracted ADB tools to $tempPath"
 
-    # Cleanup
-    Remove-Item $zipPath -Force
-    Remove-Item $tempPath -Recurse -Force
-    Write-Host "Cleaned up temporary files"
+        # Move contents of inner 'platform-tools' folder into C:\ADB
+        Move-Item -Path "$tempPath\platform-tools\*" -Destination $destPath -Force
+        Write-Host "Moved ADB files to $destPath"
 
-    # (Optional) Add to PATH environment variable
-    $envPath = [System.Environment]::GetEnvironmentVariable("Path", "Machine")
-    if ($envPath -notlike "*$destPath*") {
-        [System.Environment]::SetEnvironmentVariable("Path", "$envPath;$destPath", "Machine")
-        Write-Host "Added $destPath to system PATH"
+        # Cleanup
+        Remove-Item $zipPath -Force
+        Remove-Item $tempPath -Recurse -Force
+        Write-Host "Cleaned up temporary files"
+
+        # (Optional) Add to PATH environment variable
+        $envPath = [System.Environment]::GetEnvironmentVariable("Path", "Machine")
+        if ($envPath -notlike "*$destPath*") {
+            [System.Environment]::SetEnvironmentVariable("Path", "$envPath;$destPath", "Machine")
+            Write-Host "Added $destPath to system PATH"
+        }
+
+        Write-OK "ADB tools installed successfully."
+    } catch {
+        Write-Error "ADB installation failed: $($_.Exception.Message)"
     }
-
-    Write-OK "ADB tools installed successfully."
-} catch {
-    Write-Error "ADB installation failed: $($_.Exception.Message)"
 }
 
 # ============================================================================
@@ -928,9 +935,13 @@ try {
     Write-Host "Downloaded installer to $installerPath"
 
     # Run installer silently (Inno Setup supports /VERYSILENT)
-    Start-Process -FilePath $installerPath -ArgumentList "/VERYSILENT /NORESTART" -Wait
+    # Removed -Wait so script continues immediately
+    Start-Process -FilePath $installerPath -ArgumentList "/VERYSILENT /NORESTART"
 
-    Write-OK "Lenovo Legion Toolkit installed successfully."
+    Write-OK "Lenovo Legion Toolkit installation started (running silently in background)."
+
+    # Optional: give installer a few seconds before cleanup
+    Start-Sleep -Seconds 5
 
     # Cleanup
     Remove-Item $installerPath -Force
@@ -1068,6 +1079,7 @@ Write-Host ""
 
 Start-Sleep -Seconds $rebootDelay
 shutdown /r /t 0
+
 
 
 
