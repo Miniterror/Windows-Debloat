@@ -868,7 +868,7 @@ Write-OK "Application installation and configuration complete."
 Write-Info "Setting custom wallpaper..."
 
 # Define paths
-$WallpaperUrl  = "https://wallpapercave.com/wp/wp14662630.jpg"
+$WallpaperUrl  = "https://wallpapercave.com/wp/wp10423643.png"
 $WallpaperPath = "$env:PUBLIC\Pictures\CustomWallpaper.jpg"
 $WallpaperPng  = "$env:PUBLIC\Pictures\CustomWallpaper.png"
 
@@ -992,6 +992,7 @@ Write-Host ""
 
 Start-Sleep -Seconds $rebootDelay
 shutdown /r /t 0
+
 
 
 
