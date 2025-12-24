@@ -463,27 +463,7 @@ reg add "HKLM\System\CurrentControlSet\Control\DeviceGuard\Scenarios\HypervisorE
 Write-Info "Applying SvcHostSplitThresholdInKB..."
 reg add "HKLM\SYSTEM\CurrentControlSet\Control" /v SvcHostSplitThresholdInKB /t REG_DWORD /d 67108864 /f > $null
 
-# 9. LOCALE, TIMEZONE, LANGUAGE
-# ============================================================================
-
-Write-Info "Setting locale/timezone to NL / W. Europe..."
-
-tzutil /s "W. Europe Standard Time"
-Set-WinSystemLocale nl-NL
-Set-WinUserLanguageList nl-NL -Force
-Set-Culture nl-NL
-Set-WinHomeLocation -GeoId 176  # Nederland
-
-Write-Info "Forcing time synchronization..."
-
-# Restart Windows Time service
-Stop-Service w32time
-Start-Service w32time
-
-# Trigger immediate sync
-w32tm /resync /force
-
-# 10. THEME / ACCENT COLOR
+# 9. THEME / ACCENT COLOR
 # ============================================================================
 
 Write-Info "Applying dark theme & accent color..."
@@ -517,7 +497,7 @@ try {
 }
 
 
-# 11. DEFAULT USER HIVE TWEAKS
+# 10. DEFAULT USER HIVE TWEAKS
 # ============================================================================
 
 Write-Info "Applying DefaultUser hive tweaks..."
@@ -577,7 +557,7 @@ if (Test-Path $defaultNtUser) {
 }
 
 
-# 12. EDGE POLICIES + EU-CONDITIONAL EDGE REMOVAL
+# 11. EDGE POLICIES + EU-CONDITIONAL EDGE REMOVAL
 # ============================================================================
 
 Write-Info "Applying Edge policies..."
@@ -610,7 +590,7 @@ if ($IsEU) {
 }
 
 
-# 13. EXPLORER / SEARCH / CLASSIC CONTEXT MENU / WEB INTEGRATION
+# 12. EXPLORER / SEARCH / CLASSIC CONTEXT MENU / WEB INTEGRATION
 # ============================================================================
 
 Write-Info "Applying Explorer tweaks..."
@@ -635,7 +615,7 @@ reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" /v Sh
 reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" /v ShowCloudFilesInHome /t REG_DWORD /d 0 /f > $null
 
 
-# 14. ONEDRIVE FULL REMOVAL
+# 13. ONEDRIVE FULL REMOVAL
 # ============================================================================
 
 Write-Info "Removing OneDrive completely..."
@@ -661,7 +641,7 @@ reg delete "HKCU\Software\Microsoft\Windows\CurrentVersion\Run" /v OneDrive /f 2
 reg add "HKCR\CLSID\{018D5C66-4533-4307-9B53-224DE2ED1FE6}" /v System.IsPinnedToNameSpaceTree /t REG_DWORD /d 0 /f 2>$null
 
 # ============================================================================
-# 15. APPLICATION INSTALLATION (Chrome, 7-Zip, Notepad++, PuTTY, HWiNFO64, MSI Afterburner)
+# 14. APPLICATION INSTALLATION
 # ============================================================================
 
 function Write-Info { param($m) Write-Host "[INFO]  $m" -ForegroundColor Cyan }
@@ -713,26 +693,31 @@ function Remove-Installer {
 $chromeInstalled = Test-AppInstalled "Google Chrome"
 
 if (-not $chromeInstalled) {
-    Write-Info "Installing Google Chrome (silent)..."
-    $chromeInstaller = Join-Path $env:TEMP 'chrome_installer.exe'
+    $choice = Read-Host "Google Chrome not found. Do you want to install Google Chrome? (Y/N)"
+    if ($choice -eq "Y") {
+        Write-Info "Installing Google Chrome (silent)..."
+        $chromeInstaller = Join-Path $env:TEMP 'chrome_installer.exe'
 
-    try {
-        Invoke-WebRequest -Uri "https://dl.google.com/chrome/install/latest/chrome_installer.exe" -OutFile $chromeInstaller -UseBasicParsing -ErrorAction Stop
-        Start-Process -FilePath $chromeInstaller -ArgumentList "/silent","/install" -Wait -ErrorAction Stop
-        Write-OK "Google Chrome installed."
+        try {
+            Invoke-WebRequest -Uri "https://dl.google.com/chrome/install/latest/chrome_installer.exe" -OutFile $chromeInstaller -UseBasicParsing -ErrorAction Stop
+            Start-Process -FilePath $chromeInstaller -ArgumentList "/silent","/install" -Wait -ErrorAction Stop
+            Write-OK "Google Chrome installed."
 
-        # Set Chrome as default
-        $chromeExe = Join-Path $env:ProgramFiles 'Google\Chrome\Application\chrome.exe'
-        if (Test-Path $chromeExe) {
-            Start-Process -FilePath $chromeExe -ArgumentList '--make-default-browser'
-            Write-OK "Chrome set as default browser."
+            # Set Chrome as default
+            $chromeExe = Join-Path $env:ProgramFiles 'Google\Chrome\Application\chrome.exe'
+            if (Test-Path $chromeExe) {
+                Start-Process -FilePath $chromeExe -ArgumentList '--make-default-browser'
+                Write-OK "Chrome set as default browser."
+            }
+
+        } catch {
+            Write-Err "Failed to install Google Chrome: $($_.Exception.Message)"
         }
 
-    } catch {
-        Write-Err "Failed to install Google Chrome: $($_.Exception.Message)"
+        Remove-Installer $chromeInstaller
+    } else {
+        Write-Info "Skipped installing Google Chrome."
     }
-
-    Remove-Installer $chromeInstaller
 } else {
     Write-Info "Google Chrome already installed — skipping."
 }
@@ -741,18 +726,23 @@ if (-not $chromeInstalled) {
 # 7-ZIP
 # ============================================================================
 if (-not (Test-AppInstalled "7-Zip")) {
-    Write-Info "Installing 7-Zip (silent)..."
-    $zipInstaller = Join-Path $env:TEMP '7zip_installer.exe'
+    $choice = Read-Host "7-Zip not found. Do you want to install 7-Zip? (Y/N)"
+    if ($choice -eq "Y") {
+        Write-Info "Installing 7-Zip (silent)..."
+        $zipInstaller = Join-Path $env:TEMP '7zip_installer.exe'
 
-    try {
-        Invoke-WebRequest -Uri "https://www.7-zip.org/a/7z2408-x64.exe" -OutFile $zipInstaller -UseBasicParsing -ErrorAction Stop
-        Start-Process -FilePath $zipInstaller -ArgumentList "/S" -Wait -ErrorAction Stop
-        Write-OK "7-Zip installed."
-    } catch {
-        Write-Err "Failed to install 7-Zip: $($_.Exception.Message)"
+        try {
+            Invoke-WebRequest -Uri "https://www.7-zip.org/a/7z2408-x64.exe" -OutFile $zipInstaller -UseBasicParsing -ErrorAction Stop
+            Start-Process -FilePath $zipInstaller -ArgumentList "/S" -Wait -ErrorAction Stop
+            Write-OK "7-Zip installed."
+        } catch {
+            Write-Err "Failed to install 7-Zip: $($_.Exception.Message)"
+        }
+
+        Remove-Installer $zipInstaller
+    } else {
+        Write-Info "Skipped installing 7-Zip."
     }
-
-    Remove-Installer $zipInstaller
 } else {
     Write-Info "7-Zip already installed — skipping."
 }
@@ -761,52 +751,61 @@ if (-not (Test-AppInstalled "7-Zip")) {
 # NOTEPAD++
 # ============================================================================
 if (-not (Test-AppInstalled "Notepad++")) {
-    Write-Info "Installing Notepad++ (silent)..."
+    $choice = Read-Host "Notepad++ not found. Do you want to install Notepad++? (Y/N)"
+    if ($choice -eq "Y") {
+        Write-Info "Installing Notepad++ (silent)..."
 
-    $npInstaller = Join-Path $env:TEMP 'npp_installer.exe'
-    $apiUrl = "https://api.github.com/repos/notepad-plus-plus/notepad-plus-plus/releases/latest"
+        $npInstaller = Join-Path $env:TEMP 'npp_installer.exe'
+        $apiUrl = "https://api.github.com/repos/notepad-plus-plus/notepad-plus-plus/releases/latest"
 
-    try {
-        $headers = @{ "User-Agent" = "Mozilla/5.0" }
-        $release = Invoke-RestMethod -Uri $apiUrl -Headers $headers -ErrorAction Stop
+        try {
+            $headers = @{ "User-Agent" = "Mozilla/5.0" }
+            $release = Invoke-RestMethod -Uri $apiUrl -Headers $headers -ErrorAction Stop
 
-        $asset = $release.assets |
-            Where-Object { $_.name -match "Installer.*x64.*\.exe$" } |
-            Select-Object -First 1
+            $asset = $release.assets |
+                Where-Object { $_.name -match "Installer.*x64.*\.exe$" } |
+                Select-Object -First 1
 
-        $nppUrl = $asset.browser_download_url
-        Start-BitsTransfer -Source $nppUrl -Destination $npInstaller -ErrorAction Stop
+            $nppUrl = $asset.browser_download_url
+            Start-BitsTransfer -Source $nppUrl -Destination $npInstaller -ErrorAction Stop
 
-        Start-Process -FilePath $npInstaller -ArgumentList "/S" -Wait -ErrorAction Stop
-        Write-OK "Notepad++ installed."
+            Start-Process -FilePath $npInstaller -ArgumentList "/S" -Wait -ErrorAction Stop
+            Write-OK "Notepad++ installed."
+        }
+        catch {
+            Write-Err "Failed to install Notepad++: $($_.Exception.Message)"
+        }
+
+        Remove-Installer $npInstaller
+    } else {
+        Write-Info "Skipped installing Notepad++."
     }
-    catch {
-        Write-Err "Failed to install Notepad++: $($_.Exception.Message)"
-    }
-
-    Remove-Installer $npInstaller
 } else {
     Write-Info "Notepad++ already installed — skipping."
 }
-
 # ============================================================================
 # DISCORD
 # ============================================================================
 if (-not (Test-AppInstalled "Discord")) {
-    Write-Info "Installing Discord (silent)..."
-    $discordInstaller = Join-Path $env:TEMP 'discord_installer.exe'
-    $discordUrl = "https://discord.com/api/download?platform=win"
+    $choice = Read-Host "Discord not found. Do you want to install Discord? (Y/N)"
+    if ($choice -eq "Y") {
+        Write-Info "Installing Discord (silent)..."
+        $discordInstaller = Join-Path $env:TEMP 'discord_installer.exe'
+        $discordUrl = "https://discord.com/api/download?platform=win"
 
-    try {
-        Invoke-WebRequest -Uri $discordUrl -OutFile $discordInstaller -ErrorAction Stop
-        Start-Process -FilePath $discordInstaller -ArgumentList "/S" -Wait -ErrorAction Stop
-        Write-OK "Discord installed."
-    }
-    catch {
-        Write-Err "Failed to install Discord: $($_.Exception.Message)"
-    }
+        try {
+            Invoke-WebRequest -Uri $discordUrl -OutFile $discordInstaller -ErrorAction Stop
+            Start-Process -FilePath $discordInstaller -ArgumentList "/S" -Wait -ErrorAction Stop
+            Write-OK "Discord installed."
+        }
+        catch {
+            Write-Err "Failed to install Discord: $($_.Exception.Message)"
+        }
 
-    Remove-Installer $discordInstaller
+        Remove-Installer $discordInstaller
+    } else {
+        Write-Info "Skipped installing Discord."
+    }
 } else {
     Write-Info "Discord already installed — skipping."
 }
@@ -815,19 +814,24 @@ if (-not (Test-AppInstalled "Discord")) {
 # STEAM
 # ============================================================================
 if (-not (Test-AppInstalled "Steam")) {
-    Write-Info "Installing Steam (silent)..."
-    $steamInstaller = Join-Path $env:TEMP 'steam_installer.exe'
-    $steamUrl = "https://cdn.cloudflare.steamstatic.com/client/installer/SteamSetup.exe"
+    $choice = Read-Host "Steam not found. Do you want to install Steam? (Y/N)"
+    if ($choice -eq "Y") {
+        Write-Info "Installing Steam (silent)..."
+        $steamInstaller = Join-Path $env:TEMP 'steam_installer.exe'
+        $steamUrl = "https://cdn.cloudflare.steamstatic.com/client/installer/SteamSetup.exe"
 
-    try {
-        Invoke-WebRequest -Uri $steamUrl -OutFile $steamInstaller -UseBasicParsing -ErrorAction Stop
-        Start-Process -FilePath $steamInstaller -ArgumentList "/S" -Wait -ErrorAction Stop
-        Write-OK "Steam installed."
-    } catch {
-        Write-Err "Failed to install Steam: $($_.Exception.Message)"
+        try {
+            Invoke-WebRequest -Uri $steamUrl -OutFile $steamInstaller -UseBasicParsing -ErrorAction Stop
+            Start-Process -FilePath $steamInstaller -ArgumentList "/S" -Wait -ErrorAction Stop
+            Write-OK "Steam installed."
+        } catch {
+            Write-Err "Failed to install Steam: $($_.Exception.Message)"
+        }
+
+        Remove-Installer $steamInstaller
+    } else {
+        Write-Info "Skipped installing Steam."
     }
-
-    Remove-Installer $steamInstaller
 } else {
     Write-Info "Steam already installed — skipping."
 }
@@ -836,19 +840,24 @@ if (-not (Test-AppInstalled "Steam")) {
 # PUTTY
 # ============================================================================
 if (-not (Test-AppInstalled "PuTTY")) {
-    Write-Info "Installing PuTTY (silent)..."
-    $puttyInstaller = Join-Path $env:TEMP 'putty.msi'
-    $puttyUrl = "https://the.earth.li/~sgtatham/putty/0.81/w64/putty-64bit-0.81-installer.msi"
+    $choice = Read-Host "PuTTY not found. Do you want to install PuTTY? (Y/N)"
+    if ($choice -eq "Y") {
+        Write-Info "Installing PuTTY (silent)..."
+        $puttyInstaller = Join-Path $env:TEMP 'putty.msi'
+        $puttyUrl = "https://the.earth.li/~sgtatham/putty/0.81/w64/putty-64bit-0.81-installer.msi"
 
-    try {
-        Invoke-WebRequest -Uri $puttyUrl -OutFile $puttyInstaller -ErrorAction Stop
-        Start-Process "msiexec.exe" -ArgumentList "/i `"$puttyInstaller`" /qn" -Wait
-        Write-OK "PuTTY installed."
-    } catch {
-        Write-Err "Failed to install PuTTY: $($_.Exception.Message)"
+        try {
+            Invoke-WebRequest -Uri $puttyUrl -OutFile $puttyInstaller -ErrorAction Stop
+            Start-Process "msiexec.exe" -ArgumentList "/i `"$puttyInstaller`" /qn" -Wait
+            Write-OK "PuTTY installed."
+        } catch {
+            Write-Err "Failed to install PuTTY: $($_.Exception.Message)"
+        }
+
+        Remove-Installer $puttyInstaller
+    } else {
+        Write-Info "Skipped installing PuTTY."
     }
-
-    Remove-Installer $puttyInstaller
 } else {
     Write-Info "PuTTY already installed — skipping."
 }
@@ -857,107 +866,142 @@ if (-not (Test-AppInstalled "PuTTY")) {
 # HWiNFO64 (via Winget)
 # ============================================================================
 if (-not (Test-AppInstalled "HWiNFO64")) {
-    Write-Info "Installing HWiNFO64 via Winget (silent)..."
-    try {
-        winget install --id REALiX.HWiNFO --silent --accept-package-agreements --accept-source-agreements
-        Write-OK "HWiNFO64 installed."
-    }
-    catch {
-        Write-Err "Failed to install HWiNFO64: $($_.Exception.Message)"
+    $choice = Read-Host "HWiNFO64 not found. Do you want to install HWiNFO64? (Y/N)"
+    if ($choice -eq "Y") {
+        Write-Info "Installing HWiNFO64 via Winget (silent)..."
+        try {
+            winget install --id REALiX.HWiNFO --silent --accept-package-agreements --accept-source-agreements
+            Write-OK "HWiNFO64 installed."
+        }
+        catch {
+            Write-Err "Failed to install HWiNFO64: $($_.Exception.Message)"
+        }
+    } else {
+        Write-Info "Skipped installing HWiNFO64."
     }
 } else {
     Write-Info "HWiNFO64 already installed — skipping."
 }
+
 Write-OK "Application installation and configuration complete."
 
 # ============================================================================
 # ADB tools
 # ============================================================================
-Write-Info "Downloading and installing Android Platform Tools (ADB)..."
+$choice = Read-Host "Do you want to install Android Platform Tools (ADB)? (Y/N)"
+if ($choice -eq "Y") {
+    Write-Info "Downloading and installing Android Platform Tools (ADB)..."
 
-# Define URL and paths
-$adbUrl   = "https://dl.google.com/android/repository/platform-tools-latest-windows.zip"
-$zipPath  = "$env:TEMP\platform-tools.zip"
-$tempPath = "$env:TEMP\platform-tools-temp"
-$destPath = "C:\ADB"
+    $adbUrl   = "https://dl.google.com/android/repository/platform-tools-latest-windows.zip"
+    $zipPath  = "$env:TEMP\platform-tools.zip"
+    $tempPath = "$env:TEMP\platform-tools-temp"
+    $destPath = "C:\ADB"
 
-# Check if ADB is already installed
-if (Test-Path $destPath) {
-    Write-Host "ADB directory already exists at $destPath. Skipping download and installation."
-} else {
-    try {
-        # Download the ZIP
-        Invoke-WebRequest -Uri $adbUrl -OutFile $zipPath -UseBasicParsing
-        Write-Host "Downloaded ADB package to $zipPath"
+    if (Test-Path $destPath) {
+        Write-Host "ADB directory already exists at $destPath. Skipping download and installation."
+    } else {
+        try {
+            Invoke-WebRequest -Uri $adbUrl -OutFile $zipPath -UseBasicParsing
+            Write-Host "Downloaded ADB package to $zipPath"
 
-        # Ensure temp folder is clean
-        if (Test-Path $tempPath) { Remove-Item $tempPath -Recurse -Force }
+            if (Test-Path $tempPath) { Remove-Item $tempPath -Recurse -Force }
+            New-Item -ItemType Directory -Path $destPath | Out-Null
+            Expand-Archive -Path $zipPath -DestinationPath $tempPath -Force
+            Write-Host "Extracted ADB tools to $tempPath"
 
-        # Create destination folder
-        New-Item -ItemType Directory -Path $destPath | Out-Null
+            Move-Item -Path "$tempPath\platform-tools\*" -Destination $destPath -Force
+            Write-Host "Moved ADB files to $destPath"
 
-        # Extract the ZIP into temp
-        Expand-Archive -Path $zipPath -DestinationPath $tempPath -Force
-        Write-Host "Extracted ADB tools to $tempPath"
+            Remove-Item $zipPath -Force
+            Remove-Item $tempPath -Recurse -Force
+            Write-Host "Cleaned up temporary files"
 
-        # Move contents of inner 'platform-tools' folder into C:\ADB
-        Move-Item -Path "$tempPath\platform-tools\*" -Destination $destPath -Force
-        Write-Host "Moved ADB files to $destPath"
+            $envPath = [System.Environment]::GetEnvironmentVariable("Path", "Machine")
+            if ($envPath -notlike "*$destPath*") {
+                [System.Environment]::SetEnvironmentVariable("Path", "$envPath;$destPath", "Machine")
+                Write-Host "Added $destPath to system PATH"
+            }
 
-        # Cleanup
-        Remove-Item $zipPath -Force
-        Remove-Item $tempPath -Recurse -Force
-        Write-Host "Cleaned up temporary files"
-
-        # (Optional) Add to PATH environment variable
-        $envPath = [System.Environment]::GetEnvironmentVariable("Path", "Machine")
-        if ($envPath -notlike "*$destPath*") {
-            [System.Environment]::SetEnvironmentVariable("Path", "$envPath;$destPath", "Machine")
-            Write-Host "Added $destPath to system PATH"
+            Write-OK "ADB tools installed successfully."
+        } catch {
+            Write-Error "ADB installation failed: $($_.Exception.Message)"
         }
-
-        Write-OK "ADB tools installed successfully."
-    } catch {
-        Write-Error "ADB installation failed: $($_.Exception.Message)"
     }
+} else {
+    Write-Info "Skipped installing ADB tools."
 }
 
 # ============================================================================
 # Lenovo Legion Toolkit
 # ============================================================================
 if (-not (Test-AppInstalled "Lenovo Legion Toolkit")) {
-    Write-Info "Downloading and installing Lenovo Legion Toolkit from GitHub..."
+    $choice = Read-Host "Lenovo Legion Toolkit not found. Do you want to install Lenovo Legion Toolkit? (Y/N)"
+    if ($choice -eq "Y") {
+        Write-Info "Two versions are available:"
+        Write-Host "  [1] BartoszCichecki version (works only up to Gen 9 systems)" -ForegroundColor Yellow
+        Write-Host "  [2] XKaguya version (newer fork, supports later generations)" -ForegroundColor Cyan
 
-    # GitHub API for latest release
-    $apiUrl = "https://api.github.com/repos/BartoszCichecki/LenovoLegionToolkit/releases/latest"
-    $release = Invoke-RestMethod -Uri $apiUrl -UseBasicParsing
+        $versionChoice = Read-Host "Which version would you like to install? (1/2)"
 
-    # Find the EXE asset
-    $asset = $release.assets | Where-Object { $_.name -like "*.exe" } | Select-Object -First 1
-    $downloadUrl = $asset.browser_download_url
-    $installerPath = "$env:TEMP\$($asset.name)"
+        if ($versionChoice -eq "1") {
+            Write-Info "Downloading and installing Lenovo Legion Toolkit (BartoszCichecki, Gen 9 and earlier)..."
 
-    try {
-        # Download installer
-        Invoke-WebRequest -Uri $downloadUrl -OutFile $installerPath -UseBasicParsing
-        Write-Host "Downloaded installer to $installerPath"
+            $apiUrl = "https://api.github.com/repos/BartoszCichecki/LenovoLegionToolkit/releases/latest"
+            $release = Invoke-RestMethod -Uri $apiUrl -UseBasicParsing
 
-        # Run installer silently
-        Start-Process -FilePath $installerPath -ArgumentList "/VERYSILENT /NORESTART"
+            $asset = $release.assets | Where-Object { $_.name -like "*.exe" } | Select-Object -First 1
+            $downloadUrl = $asset.browser_download_url
+            $installerPath = "$env:TEMP\$($asset.name)"
 
-        Write-OK "Lenovo Legion Toolkit installation started (running silently in background)."
+            try {
+                Invoke-WebRequest -Uri $downloadUrl -OutFile $installerPath -UseBasicParsing
+                Write-Host "Downloaded installer to $installerPath"
 
-        Start-Sleep -Seconds 5
-        Remove-Item $installerPath -Force
-        Write-Host "Deleted installer file"
-    } catch {
-        Write-Error "Installation failed: $($_.Exception.Message)"
+                Start-Process -FilePath $installerPath -ArgumentList "/VERYSILENT /NORESTART"
+                Write-OK "Lenovo Legion Toolkit installation started (Gen 9 version)."
+
+                Start-Sleep -Seconds 5
+                Remove-Item $installerPath -Force
+                Write-Host "Deleted installer file"
+            } catch {
+                Write-Error "Installation failed: $($_.Exception.Message)"
+            }
+        }
+        elseif ($versionChoice -eq "2") {
+            Write-Info "Downloading and installing Lenovo Legion Toolkit (XKaguya fork, newer systems)..."
+
+            $apiUrl = "https://api.github.com/repos/XKaguya/LenovoLegionToolkit/releases/latest"
+            $release = Invoke-RestMethod -Uri $apiUrl -UseBasicParsing
+
+            $asset = $release.assets | Where-Object { $_.name -like "*.exe" } | Select-Object -First 1
+            $downloadUrl = $asset.browser_download_url
+            $installerPath = "$env:TEMP\$($asset.name)"
+
+            try {
+                Invoke-WebRequest -Uri $downloadUrl -OutFile $installerPath -UseBasicParsing
+                Write-Host "Downloaded installer to $installerPath"
+
+                Start-Process -FilePath $installerPath -ArgumentList "/VERYSILENT /NORESTART"
+                Write-OK "Lenovo Legion Toolkit installation started (XKaguya version)."
+
+                Start-Sleep -Seconds 5
+                Remove-Item $installerPath -Force
+                Write-Host "Deleted installer file"
+            } catch {
+                Write-Error "Installation failed: $($_.Exception.Message)"
+            }
+        }
+        else {
+            Write-Warn "Invalid choice. Skipping Lenovo Legion Toolkit installation."
+        }
+    } else {
+        Write-Info "Skipped installing Lenovo Legion Toolkit."
     }
 } else {
     Write-Info "Lenovo Legion Toolkit already installed — skipping."
 }
 
-# 16. DEFAULT WALLPAPER
+# 15. DEFAULT WALLPAPER
 # ============================================================================
 Write-Info "Setting custom wallpaper..."
 
@@ -994,7 +1038,7 @@ public class Wallpaper {
 
 Write-OK "Custom wallpaper applied with full quality (PNG)."
 
-# 17. TASKBAR CACHE CLEANUP + EXPLORER RESTART
+# 16. TASKBAR CACHE CLEANUP + EXPLORER RESTART
 # ============================================================================
 Write-Host "Cleaning taskbar cache..."
 
@@ -1068,7 +1112,7 @@ public class RestartShell {
     Write-Error "Taskbar cleanup failed: $($_.Exception.Message)"
 }
 
-# 18. AUTOMATIC REBOOT WITH BANNER
+# 17. AUTOMATIC REBOOT WITH BANNER
 # ============================================================================
 
 $rebootDelay = 15
@@ -1086,6 +1130,7 @@ Write-Host ""
 
 Start-Sleep -Seconds $rebootDelay
 shutdown /r /t 0
+
 
 
 
