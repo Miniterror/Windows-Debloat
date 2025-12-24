@@ -463,7 +463,6 @@ reg add "HKLM\System\CurrentControlSet\Control\DeviceGuard\Scenarios\HypervisorE
 Write-Info "Applying SvcHostSplitThresholdInKB..."
 reg add "HKLM\SYSTEM\CurrentControlSet\Control" /v SvcHostSplitThresholdInKB /t REG_DWORD /d 67108864 /f > $null
 
-
 # 9. LOCALE, TIMEZONE, LANGUAGE
 # ============================================================================
 
@@ -475,6 +474,14 @@ Set-WinUserLanguageList nl-NL -Force
 Set-Culture nl-NL
 Set-WinHomeLocation -GeoId 176  # Nederland
 
+Write-Info "Forcing time synchronization..."
+
+# Restart Windows Time service
+Stop-Service w32time
+Start-Service w32time
+
+# Trigger immediate sync
+w32tm /resync /force
 
 # 10. THEME / ACCENT COLOR
 # ============================================================================
@@ -1079,6 +1086,7 @@ Write-Host ""
 
 Start-Sleep -Seconds $rebootDelay
 shutdown /r /t 0
+
 
 
 
