@@ -866,7 +866,7 @@ Write-OK "Application installation and configuration complete."
 Write-Info "Setting custom wallpaper..."
 
 # Define paths
-$WallpaperUrl  = "https://c4.wallpaperflare.com/wallpaper/469/844/910/lenovo-legion-5-hd-wallpaper-preview.jpg"
+$WallpaperUrl  = "https://mcdn.wallpapersafari.com/medium/95/63/tDhv2A.jpg"
 $WallpaperPath = "$env:PUBLIC\Pictures\CustomWallpaper.jpg"
 
 # Download the image
@@ -974,6 +974,7 @@ Write-Host ""
 
 Start-Sleep -Seconds $rebootDelay
 shutdown /r /t 0
+
 
 
 
