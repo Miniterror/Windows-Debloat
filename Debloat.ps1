@@ -913,21 +913,30 @@ try {
 # ============================================================================
 Write-Info "Downloading and installing ThrottleStop..."
 
-# Define URL and paths
 $pageUrl  = "https://www.techpowerup.com/download/techpowerup-throttlestop/"
 $zipPath  = "$env:TEMP\throttlestop.zip"
 $tempPath = "$env:TEMP\throttlestop-temp"
 $destPath = "C:\ThrottleStop"
 
 try {
-    # Fetch the download page and extract the latest ZIP link
-    $page = Invoke-WebRequest -Uri $pageUrl -UseBasicParsing
-    $link = ($page.Links | Where-Object { $_.href -like "*.zip" -and $_.href -like "*ThrottleStop*" } | Select-Object -First 1).href
+    # Fetch the download page
+    $page = Invoke-WebRequest -Uri $pageUrl
+
+    # Look for the first link that contains 'download' and ends with .zip
+    $link = ($page.ParsedHtml.getElementsByTagName("a") | Where-Object {
+        $_.href -match "download" -and $_.href -match "\.zip$"
+    } | Select-Object -First 1).href
 
     if (-not $link) { throw "Could not find ThrottleStop ZIP link on TechPowerUp page." }
 
+    # TechPowerUp often uses relative URLs, so fix them
+    if ($link -notmatch "^https?://") {
+        $uri = [System.Uri]::new($pageUrl, $link)
+        $link = $uri.AbsoluteUri
+    }
+
     # Download the ZIP
-    Invoke-WebRequest -Uri $link -OutFile $zipPath -UseBasicParsing
+    Invoke-WebRequest -Uri $link -OutFile $zipPath
     Write-Host "Downloaded ThrottleStop package to $zipPath"
 
     # Ensure temp and destination folders exist
@@ -1086,5 +1095,6 @@ Write-Host ""
 
 Start-Sleep -Seconds $rebootDelay
 shutdown /r /t 0
+
 
 
