@@ -920,7 +920,9 @@ if (-not (Test-AppInstalled "Discord")) {
 } else {
     Write-Info "Discord already installed — skipping."
 }
-
+# -------------------------
+# STEAM
+# -------------------------
 if (-not (Test-AppInstalled "Steam")) {
 
     if (Ask-Install "Steam") {
@@ -1027,6 +1029,7 @@ Write-Host ""
 
 Start-Sleep -Seconds $rebootDelay
 shutdown /r /t 0
+
 
 
 
