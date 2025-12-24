@@ -1,16 +1,15 @@
 # ============================================================================
 # 0. ADMIN CHECK, LOGGING, HELPER FUNCTIONS
 # ============================================================================
-# Controleer of script als Administrator draait
-$IsAdmin = ([Security.Principal.WindowsPrincipal] 
-    [Security.Principal.WindowsIdentity]::GetCurrent()
+# Admin check
+$IsAdmin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()
 ).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 
 if (-not $IsAdmin) {
     Write-Host "[ERROR] Run this script as Administrator." -ForegroundColor Red
     Write-Host ""
-    Write-Host "This window will close in 10 seconds..." -ForegroundColor Yellow
-    Start-Sleep -Seconds 10
+    Write-Host "This window will close in 5 seconds..." -ForegroundColor Yellow
+    Start-Sleep -Seconds 5
     exit 1
 }
 
@@ -897,3 +896,4 @@ Write-Host ""
 
 Start-Sleep -Seconds $rebootDelay
 shutdown /r /t 0
+
