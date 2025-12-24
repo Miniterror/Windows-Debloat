@@ -863,7 +863,7 @@ if (-not (Test-AppInstalled "PuTTY")) {
 }
 
 # ============================================================================
-# HWiNFO64 (via Winget)
+# HWiNFO64
 # ============================================================================
 if (-not (Test-AppInstalled "HWiNFO64")) {
     $choice = Read-Host "HWiNFO64 not found. Do you want to install HWiNFO64? (Y/N)"
@@ -882,8 +882,6 @@ if (-not (Test-AppInstalled "HWiNFO64")) {
 } else {
     Write-Info "HWiNFO64 already installed — skipping."
 }
-
-Write-OK "Application installation and configuration complete."
 
 # ============================================================================
 # ADB tools
@@ -943,56 +941,33 @@ if (-not (Test-AppInstalled "Lenovo Legion Toolkit")) {
 
         $versionChoice = Read-Host "Which version would you like to install? (1/2)"
 
-        if ($versionChoice -eq "1") {
-            Write-Info "Downloading and installing Lenovo Legion Toolkit (BartoszCichecki, Gen 9 and earlier)..."
-
-            $apiUrl = "https://api.github.com/repos/BartoszCichecki/LenovoLegionToolkit/releases/latest"
-            $release = Invoke-RestMethod -Uri $apiUrl -UseBasicParsing
-
-            $asset = $release.assets | Where-Object { $_.name -like "*.exe" } | Select-Object -First 1
-            $downloadUrl = $asset.browser_download_url
-            $installerPath = "$env:TEMP\$($asset.name)"
-
-            try {
-                Invoke-WebRequest -Uri $downloadUrl -OutFile $installerPath -UseBasicParsing
-                Write-Host "Downloaded installer to $installerPath"
-
-                Start-Process -FilePath $installerPath -ArgumentList "/VERYSILENT /NORESTART"
-                Write-OK "Lenovo Legion Toolkit installation started (Gen 9 version)."
-
-                Start-Sleep -Seconds 5
-                Remove-Item $installerPath -Force
-                Write-Host "Deleted installer file"
-            } catch {
-                Write-Error "Installation failed: $($_.Exception.Message)"
-            }
-        }
-        elseif ($versionChoice -eq "2") {
-            Write-Info "Downloading and installing Lenovo Legion Toolkit (XKaguya fork, newer systems)..."
-
-            $apiUrl = "https://api.github.com/repos/XKaguya/LenovoLegionToolkit/releases/latest"
-            $release = Invoke-RestMethod -Uri $apiUrl -UseBasicParsing
-
-            $asset = $release.assets | Where-Object { $_.name -like "*.exe" } | Select-Object -First 1
-            $downloadUrl = $asset.browser_download_url
-            $installerPath = "$env:TEMP\$($asset.name)"
-
-            try {
-                Invoke-WebRequest -Uri $downloadUrl -OutFile $installerPath -UseBasicParsing
-                Write-Host "Downloaded installer to $installerPath"
-
-                Start-Process -FilePath $installerPath -ArgumentList "/VERYSILENT /NORESTART"
-                Write-OK "Lenovo Legion Toolkit installation started (XKaguya version)."
-
-                Start-Sleep -Seconds 5
-                Remove-Item $installerPath -Force
-                Write-Host "Deleted installer file"
-            } catch {
-                Write-Error "Installation failed: $($_.Exception.Message)"
-            }
-        }
-        else {
+        $repoUrl = if ($versionChoice -eq "1") {
+            "https://api.github.com/repos/BartoszCichecki/LenovoLegionToolkit/releases/latest"
+        } elseif ($versionChoice -eq "2") {
+            "https://api.github.com/repos/XKaguya/LenovoLegionToolkit/releases/latest"
+        } else {
             Write-Warn "Invalid choice. Skipping Lenovo Legion Toolkit installation."
+            return
+        }
+
+        try {
+            Write-Info "Downloading Lenovo Legion Toolkit installer..."
+            $release = Invoke-RestMethod -Uri $repoUrl -UseBasicParsing
+            $asset   = $release.assets | Where-Object { $_.name -like "*.exe" } | Select-Object -First 1
+            $downloadUrl  = $asset.browser_download_url
+            $installerPath = "$env:TEMP\$($asset.name)"
+
+            Invoke-WebRequest -Uri $downloadUrl -OutFile $installerPath -UseBasicParsing
+            Write-Host "Downloaded installer to $installerPath"
+
+            # Wait for installer to finish before cleanup
+            Start-Process -FilePath $installerPath -ArgumentList "/VERYSILENT /NORESTART" -Wait
+            Write-OK "Lenovo Legion Toolkit installation completed."
+
+            Remove-Item $installerPath -Force
+            Write-Host "Deleted installer file"
+        } catch {
+            Write-Error "Installation failed: $($_.Exception.Message)"
         }
     } else {
         Write-Info "Skipped installing Lenovo Legion Toolkit."
@@ -1130,6 +1105,7 @@ Write-Host ""
 
 Start-Sleep -Seconds $rebootDelay
 shutdown /r /t 0
+
 
 
 
