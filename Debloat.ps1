@@ -89,7 +89,7 @@ $allAppxSelectors = @(
     "MicrosoftCorporationII.MicrosoftFamily","Microsoft.MicrosoftOfficeHub",
     "Microsoft.Office.OneNote","Microsoft.People","Microsoft.SkypeApp",
     "MicrosoftTeams","MSTeams","Microsoft.Wallet","Microsoft.YourPhone",
-    "*Clipchamp*","MicrosoftWindows.VoiceAccess"
+    "*Clipchamp*"
 )
 
 Remove-AppPackagesSelectors -Selectors $allAppxSelectors
@@ -270,6 +270,9 @@ reg add "HKCU\Software\Microsoft\Clipboard" /v CloudClipboard /t REG_DWORD /d 0 
 
 Write-Host "[OK] O&O Recommended Tweaks Applied."
 Write-Info "Applying extended privacy and anti-advertising hardening..."
+
+# Disable Voice Access
+reg add "HKCU\Software\Microsoft\Accessibility\VoiceAccess" /v EnableVoiceAccess /t REG_DWORD /d 0 /f > $null
 
 # Suggested apps in Start (25H2)
 reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" /v Start_IrisRecommendations /t REG_DWORD /d 0 /f > $null
@@ -974,6 +977,7 @@ Write-Host ""
 
 Start-Sleep -Seconds $rebootDelay
 shutdown /r /t 0
+
 
 
 
