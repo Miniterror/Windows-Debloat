@@ -860,7 +860,29 @@ if (-not (Test-AppInstalled "HWiNFO64")) {
 }
 Write-OK "Application installation and configuration complete."
 
-# 16. TASKBAR CACHE CLEANUP + EXPLORER RESTART
+# 16. DEFAULT WALLPAPER
+# ============================================================================
+
+Write-Info "Setting custom wallpaper..."
+
+# Define paths
+$WallpaperUrl  = "https://c4.wallpaperflare.com/wallpaper/469/844/910/lenovo-legion-5-hd-wallpaper-preview.jpg"
+$WallpaperPath = "$env:PUBLIC\Pictures\CustomWallpaper.jpg"
+
+# Download the image
+Invoke-WebRequest -Uri $WallpaperUrl -OutFile $WallpaperPath -UseBasicParsing
+
+# Set registry keys for wallpaper
+reg add "HKCU\Control Panel\Desktop" /v Wallpaper /t REG_SZ /d $WallpaperPath /f > $null
+reg add "HKCU\Control Panel\Desktop" /v WallpaperStyle /t REG_SZ /d 10 /f > $null   # 10 = Fill
+reg add "HKCU\Control Panel\Desktop" /v TileWallpaper /t REG_SZ /d 0 /f > $null
+
+# Apply wallpaper immediately
+RUNDLL32.EXE user32.dll,UpdatePerUserSystemParameters
+
+Write-OK "Custom wallpaper applied."
+
+# 17. TASKBAR CACHE CLEANUP + EXPLORER RESTART
 # ============================================================================
 Write-Host "Cleaning taskbar cache..."
 
@@ -934,7 +956,7 @@ public class RestartShell {
     Write-Error "Taskbar cleanup failed: $($_.Exception.Message)"
 }
 
-# 17. AUTOMATIC REBOOT WITH BANNER
+# 18. AUTOMATIC REBOOT WITH BANNER
 # ============================================================================
 
 $rebootDelay = 15
@@ -952,5 +974,6 @@ Write-Host ""
 
 Start-Sleep -Seconds $rebootDelay
 shutdown /r /t 0
+
 
 
