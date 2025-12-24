@@ -89,7 +89,7 @@ $allAppxSelectors = @(
     "MicrosoftCorporationII.MicrosoftFamily","Microsoft.MicrosoftOfficeHub",
     "Microsoft.Office.OneNote","Microsoft.People","Microsoft.SkypeApp",
     "MicrosoftTeams","MSTeams","Microsoft.Wallet","Microsoft.YourPhone",
-    "*Clipchamp*"
+    "*Clipchamp*","MicrosoftWindows.VoiceAccess"
 )
 
 Remove-AppPackagesSelectors -Selectors $allAppxSelectors
@@ -952,4 +952,5 @@ Write-Host ""
 
 Start-Sleep -Seconds $rebootDelay
 shutdown /r /t 0
+
 
