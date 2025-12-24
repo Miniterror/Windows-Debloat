@@ -908,6 +908,55 @@ try {
     Write-Error "ADB installation failed: $($_.Exception.Message)"
 }
 
+# ============================================================================
+# Throttlestop
+# ============================================================================
+Write-Info "Downloading and installing ThrottleStop..."
+
+# Define URL and paths
+$pageUrl  = "https://www.techpowerup.com/download/techpowerup-throttlestop/"
+$zipPath  = "$env:TEMP\throttlestop.zip"
+$tempPath = "$env:TEMP\throttlestop-temp"
+$destPath = "C:\ThrottleStop"
+
+try {
+    # Fetch the download page and extract the latest ZIP link
+    $page = Invoke-WebRequest -Uri $pageUrl -UseBasicParsing
+    $link = ($page.Links | Where-Object { $_.href -like "*.zip" -and $_.href -like "*ThrottleStop*" } | Select-Object -First 1).href
+
+    if (-not $link) { throw "Could not find ThrottleStop ZIP link on TechPowerUp page." }
+
+    # Download the ZIP
+    Invoke-WebRequest -Uri $link -OutFile $zipPath -UseBasicParsing
+    Write-Host "Downloaded ThrottleStop package to $zipPath"
+
+    # Ensure temp and destination folders exist
+    if (Test-Path $tempPath) { Remove-Item $tempPath -Recurse -Force }
+    if (-not (Test-Path $destPath)) { New-Item -ItemType Directory -Path $destPath | Out-Null }
+
+    # Extract the ZIP into temp
+    Expand-Archive -Path $zipPath -DestinationPath $tempPath -Force
+    Write-Host "Extracted ThrottleStop to $tempPath"
+
+    # Move contents of inner folder (handles versioned folder names like ThrottleStop_9.7)
+    $innerFolder = Get-ChildItem $tempPath | Where-Object { $_.PSIsContainer } | Select-Object -First 1
+    if ($innerFolder) {
+        Move-Item -Path "$($innerFolder.FullName)\*" -Destination $destPath -Force
+    } else {
+        Move-Item -Path "$tempPath\*" -Destination $destPath -Force
+    }
+    Write-Host "Moved ThrottleStop files to $destPath"
+
+    # Cleanup
+    Remove-Item $zipPath -Force
+    Remove-Item $tempPath -Recurse -Force
+    Write-Host "Cleaned up temporary files"
+
+    Write-OK "ThrottleStop installed successfully."
+} catch {
+    Write-Error "ThrottleStop installation failed: $($_.Exception.Message)"
+}
+
 # 16. DEFAULT WALLPAPER
 # ============================================================================
 Write-Info "Setting custom wallpaper..."
@@ -1037,4 +1086,5 @@ Write-Host ""
 
 Start-Sleep -Seconds $rebootDelay
 shutdown /r /t 0
+
 
