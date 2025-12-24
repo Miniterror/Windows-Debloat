@@ -927,8 +927,8 @@ try {
     Invoke-WebRequest -Uri $downloadUrl -OutFile $installerPath -UseBasicParsing
     Write-Host "Downloaded installer to $installerPath"
 
-    # Run installer silently (EXE flags vary; Lenovo Legion Toolkit supports /S)
-    Start-Process -FilePath $installerPath -ArgumentList "/S" -Wait
+    # Run installer silently (Inno Setup supports /VERYSILENT)
+    Start-Process -FilePath $installerPath -ArgumentList "/VERYSILENT /NORESTART" -Wait
 
     Write-OK "Lenovo Legion Toolkit installed successfully."
 
@@ -1068,6 +1068,7 @@ Write-Host ""
 
 Start-Sleep -Seconds $rebootDelay
 shutdown /r /t 0
+
 
 
 
