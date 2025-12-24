@@ -813,7 +813,7 @@ if (-not (Test-AppInstalled "Discord")) {
     Write-Info "Installing Discord (silent)..."
 
     $discordInstaller = Join-Path $env:TEMP 'discord_installer.exe'
-    $discordUrl = "https://dl.discordapp.net/apps/win/0.0.309/DiscordSetup.exe"
+    $discordUrl = "https://discord.com/api/download?platform=win"
 
     try {
         Write-Info "Downloading Discord installer..."
@@ -949,6 +949,7 @@ Write-Host ""
 
 Start-Sleep -Seconds $rebootDelay
 shutdown /r /t 0
+
 
 
 
