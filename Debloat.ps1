@@ -1,6 +1,6 @@
+# 0. ADMIN CHECK, LOGGING, HELPERS
 # ============================================================================
-# 0. ADMIN CHECK, LOGGING, HELPER FUNCTIONS
-# ============================================================================
+
 # Admin check
 $IsAdmin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()
 ).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
@@ -17,50 +17,39 @@ if (-not $IsAdmin) {
 function Write-Info($msg)   { Write-Host "[INFO]  $msg" -ForegroundColor Cyan }
 function Write-OK($msg)     { Write-Host "[ OK ]  $msg" -ForegroundColor Green }
 function Write-Remove($msg) { Write-Host "[DEL]  $msg" -ForegroundColor Magenta }
-function Write-Warn($msg)   { Write-Host "[WARN] $msg" -ForegroundColor Yellow }
-function Write-Err($msg)    { Write-Host "[ERR!] $msg" -ForegroundColor Red }
 
-# Start transcript logging op het bureaublad
+# Start transcript
 $Desktop = [Environment]::GetFolderPath("Desktop")
 $LogFile = Join-Path $Desktop "Full-SuperDebloat.log"
 Start-Transcript -Path $LogFile -Append
 Write-Info "Full SuperDebloat started at $(Get-Date)"
 
 
-# ============================================================================
-# 1. EU-DETECTIE (voor Edge-verwijdering)
+# 1. EU-DETECTIE (VOOR EDGE-LOGICA)
 # ============================================================================
 
 Write-Info "Checking if system is an EU-regulated build..."
 
-$dmaFlag = (Get-ItemProperty -Path "HKLM:\System\Setup\MoSetup" `
-    -Name "EnableEUDMA" -ErrorAction SilentlyContinue).EnableEUDMA
+$dmaFlag = (Get-ItemProperty -Path "HKLM:\System\Setup\MoSetup" -Name "EnableEUDMA" -ErrorAction SilentlyContinue).EnableEUDMA
+$geoId   = (Get-ItemProperty -Path "HKCU:\Control Panel\International\Geo" -Name "Nation" -ErrorAction SilentlyContinue).Nation
 
-$geoId = (Get-ItemProperty -Path "HKCU:\Control Panel\International\Geo" `
-    -Name "Nation" -ErrorAction SilentlyContinue).Nation
-
-# Lijst van EU GeoID's
-$EU_GeoIDs = @(4,8,20,28,31,40,56,70,100,112,124,191,196,203,208,233,246,250,
-               268,276,300,348,352,372,380,428,440,442,470,498,499,528,616,
-               620,642,643,688,703,705,724,752,804,807)
+$EU_GeoIDs = @(4,8,20,28,31,40,56,70,100,112,124,191,196,203,208,233,246,250,268,276,300,348,352,372,380,428,440,442,470,498,499,528,616,620,642,643,688,703,705,724,752,804,807)
 
 $IsEU = $false
 
 if ($dmaFlag -eq 1) {
     Write-OK "EU DMA flag detected."
     $IsEU = $true
-}
-elseif ($EU_GeoIDs -contains $geoId) {
+} elseif ($EU_GeoIDs -contains $geoId) {
     Write-OK "GeoID indicates EU region ($geoId)."
     $IsEU = $true
-}
-else {
+} else {
     Write-Info "System does NOT appear to be EU — Edge removal will be skipped."
 }
 
-# Maak variabele globaal beschikbaar
 Set-Variable -Name "IsEU" -Value $IsEU -Scope Global
-# ============================================================================
+
+
 # 2. APPX / PROVISIONED PACKAGE REMOVAL
 # ============================================================================
 
@@ -70,7 +59,6 @@ function Remove-AppPackagesSelectors {
     foreach ($selector in $Selectors) {
         Write-Info "Removing AppX / Provisioned: $selector"
 
-        # Verwijder AppX voor alle bestaande gebruikers
         Get-AppxPackage -AllUsers |
             Where-Object { $_.Name -eq $selector -or $_.Name -like $selector } |
             ForEach-Object {
@@ -78,7 +66,6 @@ function Remove-AppPackagesSelectors {
                 Remove-AppxPackage -Package $_.PackageFullName -AllUsers -ErrorAction SilentlyContinue
             }
 
-        # Verwijder provisioned packages (voor nieuwe gebruikers)
         Get-AppxProvisionedPackage -Online |
             Where-Object { $_.DisplayName -eq $selector -or $_.PackageName -like $selector } |
             ForEach-Object {
@@ -88,71 +75,112 @@ function Remove-AppPackagesSelectors {
     }
 }
 
-# Lijst van te verwijderen AppX apps
-# (opgeschoond, geen dubbele entries)
 $allAppxSelectors = @(
-    # Xbox
-    "Microsoft.XboxApp*","Microsoft.Xbox.TCUI*","Microsoft.XboxGameOverlay*",
-    "Microsoft.XboxGamingOverlay*","Microsoft.XboxIdentityProvider*",
-    "Microsoft.XboxSpeechToTextOverlay*","Microsoft.GamingApp*",
-
-    # Overige Microsoft apps
-    "Microsoft.Microsoft3DViewer*","Microsoft.MixedReality.Portal*",
-    "Microsoft.SkypeApp*","Microsoft.MicrosoftSolitaireCollection*",
-    "Microsoft.GetHelp*","Microsoft.Getstarted*","Microsoft.ZuneMusic*",
-    "Microsoft.ZuneVideo*","Microsoft.People*","Microsoft.WindowsMaps*",
-    "Microsoft.BingWeather*","Microsoft.BingNews*","Microsoft.News*",
-    "Microsoft.Todos*","Microsoft.WindowsFeedbackHub*",
-    "Microsoft.WindowsSoundRecorder*","Microsoft.MicrosoftStickyNotes*",
-    "Microsoft.OutlookForWindows*","Microsoft.PowerAutomateDesktop*",
-    "Microsoft.WindowsNotepad*",
-
-    # System apps / bloat
+    "Microsoft.XboxApp*","Microsoft.Xbox.TCUI*","Microsoft.XboxGameOverlay*","Microsoft.XboxGamingOverlay*",
+    "Microsoft.XboxIdentityProvider*","Microsoft.XboxSpeechToTextOverlay*","Microsoft.GamingApp*",
+    "Microsoft.Microsoft3DViewer*","Microsoft.MixedReality.Portal*","Microsoft.SkypeApp*",
+    "Microsoft.MicrosoftSolitaireCollection*","Microsoft.GetHelp*","Microsoft.Getstarted*",
+    "Microsoft.ZuneMusic*","Microsoft.ZuneVideo*","Microsoft.People*","Microsoft.WindowsMaps*",
+    "Microsoft.BingWeather*","Microsoft.BingNews*","Microsoft.News*","Microsoft.Todos*",
+    "Microsoft.WindowsFeedbackHub*","Microsoft.WindowsSoundRecorder*","Microsoft.MicrosoftStickyNotes*",
+    "Microsoft.OutlookForWindows*","Microsoft.PowerAutomateDesktop*","Microsoft.WindowsNotepad*",
     "Microsoft.BingSearch","Microsoft.WindowsCamera","Microsoft.WindowsAlarms",
     "Microsoft.Copilot","Microsoft.549981C3F5F10","Microsoft.Windows.DevHome",
     "MicrosoftCorporationII.MicrosoftFamily","Microsoft.MicrosoftOfficeHub",
     "Microsoft.Office.OneNote","Microsoft.People","Microsoft.SkypeApp",
     "MicrosoftTeams","MSTeams","Microsoft.Wallet","Microsoft.YourPhone",
-
-    # Clipchamp
     "*Clipchamp*"
 )
 
-# Voer de verwijdering uit
 Remove-AppPackagesSelectors -Selectors $allAppxSelectors
-# ============================================================================
-# 3. PRIVACY & TELEMETRY HARDENING
-# ============================================================================
+# Text/ink collection
+### DUPLICAAT — deze regel komt ook voor in Deel 2 (onderaan, handwriting blok)
+reg add "HKCU\Software\Microsoft\InputPersonalization" /v RestrictImplicitInkCollection /t REG_DWORD /d 1 /f > $null
 
-# Disable telemetry (0 = Security only)
-reg add "HKLM\Software\Policies\Microsoft\Windows\DataCollection" /v AllowTelemetry /t REG_DWORD /d 0 /f > $null
+### DUPLICAAT — deze regel komt ook voor in Deel 2 (onderaan, handwriting blok)
+reg add "HKCU\Software\Microsoft\InputPersonalization" /v RestrictImplicitTextCollection /t REG_DWORD /d 1 /f > $null
 
-# Disable feedback notifications
-reg add "HKLM\Software\Policies\Microsoft\Windows\DataCollection" /v DoNotShowFeedbackNotifications /t REG_DWORD /d 1 /f > $null
-
-# Disable Activity Feed
-reg add "HKLM\Software\Policies\Microsoft\Windows\System" /v EnableActivityFeed /t REG_DWORD /d 0 /f > $null
-
-# Prevent publishing activities
-reg add "HKLM\Software\Policies\Microsoft\Windows\System" /v PublishUserActivities /t REG_DWORD /d 0 /f > $null
-
-# Prevent uploading activities to Microsoft
-reg add "HKLM\Software\Policies\Microsoft\Windows\System" /v UploadUserActivities /t REG_DWORD /d 0 /f > $null
-
-# Disable Advertising ID
-reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\AdvertisingInfo" /v Enabled /t REG_DWORD /d 0 /f > $null
-
-reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Privacy" /v TailoredExperiencesWithDiagnosticDataEnabled /t REG_DWORD /d 0 /f > $null
-
-# Disable cloud clipboard sync
-reg add "HKCU\Software\Microsoft\Clipboard" /v CloudClipboard /t REG_DWORD /d 0 /f > $null
-
-# Disable all background apps
+# Background apps
+### DUPLICAAT — deze regel komt ook voor in Deel 2 (onderaan, background apps blok)
 reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\BackgroundAccessApplications" /v GlobalUserDisabled /t REG_DWORD /d 1 /f > $null
 
-# Disable location tracking
+# Activity history
+### DUPLICAAT — deze regel komt ook voor in Deel 2 (tweede activity history blok)
+reg add "HKLM\Software\Policies\Microsoft\Windows\System" /v EnableActivityFeed /t REG_DWORD /d 0 /f > $null
+
+### DUPLICAAT — deze regel komt ook voor in Deel 2 (tweede activity history blok)
+reg add "HKLM\Software\Policies\Microsoft\Windows\System" /v PublishUserActivities /t REG_DWORD /d 0 /f > $null
+
+### DUPLICAAT — deze regel komt ook voor in Deel 2 (tweede activity history blok)
+reg add "HKLM\Software\Policies\Microsoft\Windows\System" /v UploadUserActivities /t REG_DWORD /d 0 /f > $null
+
+# Cloud clipboard
+### DUPLICAAT — deze regel komt ook voor in Deel 2 (onderaan, cloud clipboard blok)
+reg add "HKCU\Software\Microsoft\Clipboard" /v CloudClipboard /t REG_DWORD /d 0 /f > $null
+
+# ContentDeliveryManager (ads/suggestions)
+$cdmKeys = @(
+    "SystemPaneSuggestionsEnabled","SoftLandingEnabled","RotatingLockScreenEnabled",
+    "RotatingLockScreenOverlayEnabled","SilentInstalledAppsEnabled",
+    "SubscribedContent-338393Enabled","SubscribedContent-353699Enabled",
+    "SubscribedContent-353700Enabled","PreInstalledAppsEnabled",
+    "PreInstalledAppsEverEnabled"
+)
+foreach ($key in $cdmKeys) {
+    ### DUPLICAAT — sommige van deze waarden komen ook voor in Deel 5 (CDM blok)
+    reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager" /v $key /t REG_DWORD /d 0 /f > $null
+}
+
+# Tailored experiences
+### DUPLICAAT — deze regel komt ook voor in Deel 2 (tweede privacy blok)
+reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Privacy" /v TailoredExperiencesWithDiagnosticDataEnabled /t REG_DWORD /d 0 /f > $null
+
+# Location
+### DUPLICAAT — deze regel komt ook voor in Deel 2 (tweede location blok)
 reg add "HKLM\Software\Policies\Microsoft\Windows\LocationAndSensors" /v DisableLocation /t REG_DWORD /d 1 /f > $null
 
+# App privacy access
+$privacyKeys = @(
+    "LetAppsAccessMotion","LetAppsAccessBluetooth","LetAppsAccessDocumentsLibrary",
+    "LetAppsAccessPicturesLibrary","LetAppsAccessVideosLibrary","LetAppsAccessFileSystem",
+    "LetAppsAccessUnpairedDevices","LetAppsAccessUserDictionary","LetAppsAccessPhoneCallHistory",
+    "LetAppsAccessPhoneCalls","LetAppsAccessVoiceActivation","LetAppsAccessRadios","LetAppsAccessSensors"
+)
+foreach ($key in $privacyKeys) {
+    ### DUPLICAAT — deze waarden komen ook voor in Deel 2 (permissions blok)
+    reg add "HKLM\Software\Policies\Microsoft\Windows\AppPrivacy" /v $key /t REG_DWORD /d 2 /f > $null
+}
+
+Write-Host "[INFO] Applying O&O ShutUp10++ Recommended Tweaks..."
+
+# Disable Telemetry
+### DUPLICAAT — deze regel komt ook voor in Deel 2 (eerste telemetry blok)
+reg add "HKLM\Software\Policies\Microsoft\Windows\DataCollection" /v AllowTelemetry /t REG_DWORD /d 0 /f > $null
+
+# Disable Feedback Notifications
+### DUPLICAAT — deze regel komt ook voor in Deel 2 (eerste telemetry blok)
+reg add "HKLM\Software\Policies\Microsoft\Windows\DataCollection" /v DoNotShowFeedbackNotifications /t REG_DWORD /d 1 /f > $null
+
+# Disable Advertising ID
+### DUPLICAAT — deze regel komt ook voor in Deel 2 (eerste advertising blok)
+reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\AdvertisingInfo" /v Enabled /t REG_DWORD /d 0 /f > $null
+
+# Disable Tailored Experiences
+### DUPLICAAT — deze regel komt ook voor in Deel 2 (eerste privacy blok)
+reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Privacy" /v TailoredExperiencesWithDiagnosticDataEnabled /t REG_DWORD /d 0 /f > $null
+
+# Disable Location Tracking
+### DUPLICAAT — deze regel komt ook voor in Deel 2 (eerste location blok)
+reg add "HKLM\Software\Policies\Microsoft\Windows\LocationAndSensors" /v DisableLocation /t REG_DWORD /d 1 /f > $null
+
+### DUPLICAAT — deze regel komt ook voor in Deel 2 (eerste activity history blok)
+reg add "HKLM\Software\Policies\Microsoft\Windows\System" /v EnableActivityFeed /t REG_DWORD /d 0 /f > $null
+
+### DUPLICAAT — deze regel komt ook voor in Deel 2 (eerste activity history blok)
+reg add "HKLM\Software\Policies\Microsoft\Windows\System" /v PublishUserActivities /t REG_DWORD /d 0 /f > $null
+
+### DUPLICAAT — deze regel komt ook voor in Deel 2 (eerste activity history blok)
+reg add "HKLM\Software\Policies\Microsoft\Windows\System" /v UploadUserActivities /t REG_DWORD /d 0 /f > $null
 $AppPrivacy = "HKLM\Software\Policies\Microsoft\Windows\AppPrivacy"
 
 $permissions = @(
@@ -169,103 +197,161 @@ $permissions = @(
     "LetAppsAccessPicturesLibrary",
     "LetAppsAccessVideosLibrary",
     "LetAppsAccessDocumentsLibrary",
-    "LetAppsAccessUnpairedDevices",
-    "LetAppsAccessUserDictionary",
-    "LetAppsAccessSensors",
-    "LetAppsAccessBluetooth"
+    "LetAppsAccessUnpairedDevices"
 )
 
 foreach ($perm in $permissions) {
+    ### DUPLICAAT — deze waarden komen ook voor in Deel 2 (eerder in privacyKeys-blok)
     reg add $AppPrivacy /v $perm /t REG_DWORD /d 2 /f > $null
 }
-# ============================================================================
-# 4. WINDOWS UPDATE & DRIVER POLICIES
-# ============================================================================
 
-Write-Info "Applying Windows Update, Driver, DO and OneDrive policies..."
-
-# Disable driver updates via Windows Update
+# Disable automatic driver updates (O&O Recommended)
+### DUPLICAAT — deze regel komt ook voor in Deel 2 (Windows Update blok)
 reg add "HKLM\Software\Policies\Microsoft\Windows\WindowsUpdate" /v ExcludeWUDriversInQualityUpdate /t REG_DWORD /d 1 /f > $null
 
 # Disable driver searching through Windows Update
+### DUPLICAAT — deze regel komt ook voor in Deel 2 (Windows Update blok)
 reg add "HKLM\Software\Policies\Microsoft\Windows\DriverSearching" /v DontSearchWindowsUpdate /t REG_DWORD /d 1 /f > $null
 
-# Disable Delivery Optimization (P2P updates)
+# Disable Delivery Optimization P2P
+### DUPLICAAT — deze regel komt ook voor in Deel 2 (Delivery Optimization blok)
 reg add "HKLM\Software\Policies\Microsoft\Windows\DeliveryOptimization" /v DODownloadMode /t REG_DWORD /d 0 /f > $null
 
-# Disable OneDrive file sync
+# Disable SmartScreen for Windows
+reg add "HKLM\Software\Policies\Microsoft\Windows\System" /v EnableSmartScreen /t REG_DWORD /d 0 /f > $null
+
+# Disable SmartScreen for Edge
+reg add "HKLM\Software\Policies\Microsoft\Edge" /v SmartScreenEnabled /t REG_DWORD /d 0 /f > $null
+
+# Disable Cortana
+reg add "HKLM\Software\Policies\Microsoft\Windows\Windows Search" /v AllowCortana /t REG_DWORD /d 0 /f > $null
+
+# Disable Cloud Search
+reg add "HKLM\Software\Policies\Microsoft\Windows\Windows Search" /v AllowCloudSearch /t REG_DWORD /d 0 /f > $null
+
+# Disable Consumer Experience
+### DUPLICAAT — deze regel komt ook voor in Deel 2 (eerder in CloudContent blok)
+reg add "HKLM\Software\Policies\Microsoft\Windows\CloudContent" /v DisableConsumerFeatures /t REG_DWORD /d 1 /f > $null
+
+# Disable Automatic App Install
+### DUPLICAAT — deze regel komt ook voor in Deel 2 (eerder in CloudContent blok)
+reg add "HKLM\Software\Policies\Microsoft\Windows\CloudContent" /v DisableAutomaticAppInstall /t REG_DWORD /d 1 /f > $null
+
+# Disable Suggestions in Start
+### DUPLICAAT — deze waarde komt ook voor in Deel 2 ($cdmKeys blok)
+reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager" /v SystemPaneSuggestionsEnabled /t REG_DWORD /d 0 /f > $null
+
+### DUPLICAAT — deze regel komt ook voor in Deel 2 (eerder in OneDrive blok)
 reg add "HKLM\Software\Policies\Microsoft\Windows\OneDrive" /v DisableFileSyncNGSC /t REG_DWORD /d 1 /f > $null
 
-# ============================================================================
-# 5. COPILOT, WIDGETS, TASKBAR, START MENU
-# ============================================================================
-Write-Info "Disabling Copilot, Widgets and cleaning Taskbar & Start..."
+# Disable handwriting data collection
+### DUPLICAAT — deze regel komt ook voor in Deel 2 (bovenaan handwriting blok)
+reg add "HKCU\Software\Microsoft\InputPersonalization" /v RestrictImplicitInkCollection /t REG_DWORD /d 1 /f > $null
 
-# Disable Copilot (HKCU + HKLM)
+### DUPLICAAT — deze regel komt ook voor in Deel 2 (bovenaan handwriting blok)
+reg add "HKCU\Software\Microsoft\InputPersonalization" /v RestrictImplicitTextCollection /t REG_DWORD /d 1 /f > $null
+
+# Disable background apps
+### DUPLICAAT — deze regel komt ook voor in Deel 2 (bovenaan background apps blok)
+reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\BackgroundAccessApplications" /v GlobalUserDisabled /t REG_DWORD /d 1 /f > $null
+
+# Disable Cloud Clipboard
+### DUPLICAAT — deze regel komt ook voor in Deel 2 (bovenaan cloud clipboard blok)
+reg add "HKCU\Software\Microsoft\Clipboard" /v CloudClipboard /t REG_DWORD /d 0 /f > $null
+
+# Disable Recent Items & Frequent Folders
+### DUPLICAAT — deze regel komt ook voor in Deel 3 (Explorer tweaks)
+reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer" /v ShowRecent /t REG_DWORD /d 0 /f > $null
+
+### DUPLICAAT — deze regel komt ook voor in Deel 3 (Explorer tweaks)
+reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer" /v ShowFrequent /t REG_DWORD /d 0 /f > $null
+
+Write-Host "[OK] O&O Recommended Tweaks Applied."
+# 5. WINDOWS UPDATE, DRIVERS, ONEDRIVE, DELIVERY OPTIMIZATION
+# ============================================================================
+
+Write-Info "Configuring Windows Update & driver policies..."
+
+# Driver updates via Windows Update uitschakelen
+### DUPLICAAT — deze regel komt ook voor in Deel 2 (eerder in O&O blok)
+reg add "HKLM\Software\Policies\Microsoft\Windows\WindowsUpdate" /v ExcludeWUDriversInQualityUpdate /t REG_DWORD /d 1 /f > $null
+
+### DUPLICAAT — deze regel komt ook voor in Deel 2 (eerder in O&O blok)
+reg add "HKLM\Software\Policies\Microsoft\Windows\DriverSearching" /v DontSearchWindowsUpdate /t REG_DWORD /d 1 /f > $null
+
+# Delivery Optimization
+### DUPLICAAT — deze regel komt ook voor in Deel 2 (eerder in O&O blok)
+reg add "HKLM\Software\Policies\Microsoft\Windows\DeliveryOptimization" /v DODownloadMode /t REG_DWORD /d 0 /f > $null
+
+# OneDrive sync uitschakelen
+### DUPLICAAT — deze regel komt ook voor in Deel 2 (eerder in O&O blok)
+reg add "HKLM\Software\Policies\Microsoft\Windows\OneDrive" /v DisableFileSyncNGSC /t REG_DWORD /d 1 /f > $null
+
+# Sync settings uitschakelen
+reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\SettingSync" /v SyncSettings /t REG_DWORD /d 0 /f > $null
+
+
+# 6. COPILOT, WIDGETS, TASKBAR, START, LAYOUT XML FIXES
+# ============================================================================
+
+Write-Info "Disabling Copilot and Widgets / cleaning Taskbar & Start..."
+
+# Copilot policies
 reg add "HKCU\Software\Policies\Microsoft\Windows\WindowsCopilot" /v TurnOffWindowsCopilot /t REG_DWORD /d 1 /f > $null
 reg add "HKLM\Software\Policies\Microsoft\Windows\WindowsCopilot" /v TurnOffWindowsCopilot /t REG_DWORD /d 1 /f > $null
 
-# Hide Copilot button
+# Copilot-knop verbergen
 reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" /v ShowCopilotButton /t REG_DWORD /d 0 /f > $null
 
-# Disable Widgets
+# Widgets uitschakelen
 reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" /v TaskbarDa /t REG_DWORD /d 0 /f > $null
 reg add "HKLM\Software\Policies\Microsoft\Dsh" /v AllowNewsAndInterests /t REG_DWORD /d 0 /f > $null
 
-# Remove Widgets packages
 Get-AppxPackage -AllUsers *WindowsWidgets* | Remove-AppxPackage -AllUsers -ErrorAction SilentlyContinue
 Get-AppxPackage -AllUsers *WebExperience* | Remove-AppxPackage -AllUsers -ErrorAction SilentlyContinue
 
-# ============================================================================
-# 6. TASKBAR CLEANUP
-# ============================================================================
+# Taskbar cleanup
+reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Search" /v SearchboxTaskbarMode /t REG_DWORD /d 0 /f > $null
 
-# Hide Task View button
+### DUPLICAAT — deze regel komt ook voor in Deel 4 (DefaultUser hive)
 reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" /v ShowTaskViewButton /t REG_DWORD /d 0 /f > $null
 
-# Disable pinned Store apps on taskbar
 reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" /v StoreAppsOnTaskbar /t REG_DWORD /d 0 /f > $null
-
-# Disable Start menu tracking (recent docs & apps)
 reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" /v Start_TrackDocs /t REG_DWORD /d 0 /f > $null
 reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" /v Start_TrackProgs /t REG_DWORD /d 0 /f > $null
-
-# Disable Sync Provider notifications in Explorer
 reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" /v ShowSyncProviderNotifications /t REG_DWORD /d 0 /f > $null
 
-# Taskbar alignment (0 = left)
+### DUPLICAAT — deze regel komt ook voor in Deel 4 (DefaultUser hive)
 reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" /v TaskbarAl /t REG_DWORD /d 0 /f > $null
 
-# Clear pinned taskbar items
+# Taskbar pins folder leegmaken
 $taskbarPins = "$env:APPDATA\Microsoft\Internet Explorer\Quick Launch\User Pinned\TaskBar"
 if (Test-Path $taskbarPins) {
     Write-Info "Clearing taskbar pins..."
     Get-ChildItem $taskbarPins | Remove-Item -Force -ErrorAction SilentlyContinue
 }
 
-# Re-pin File Explorer
+# File Explorer opnieuw pinnen
 $explorerPath = "C:\Windows\explorer.exe"
+$verb = "taskbarpin"
+
 $shell = New-Object -ComObject Shell.Application
 $item = $shell.Namespace((Split-Path $explorerPath)).ParseName((Split-Path $explorerPath -Leaf))
-$item.InvokeVerb("taskbarpin")
+$item.InvokeVerb($verb)
 
-# Disable automatic repinning
+# Repinning task uitschakelen
 schtasks /Change /TN "Microsoft\Windows\Shell\TaskbarLayoutModification" /Disable 2>$null
 
-
-# ============================================================================
-# 7. START MENU CLEANUP
-# ============================================================================
-
+# Start menu pins via policy
 Write-Info "Clearing Start menu pins..."
-
 $keyStartPolicy = 'Registry::HKLM\SOFTWARE\Microsoft\PolicyManager\current\device\Start'
 New-Item -Path $keyStartPolicy -ItemType Directory -ErrorAction SilentlyContinue | Out-Null
 Set-ItemProperty -LiteralPath $keyStartPolicy -Name 'ConfigureStartPins' -Value '{"pinnedList":[]}' -Type String
-# ============================================================================
-# 5. LINKEDIN / STORE LAYOUT CLEANUP
-# ============================================================================
+# LinkedIn AppX volledig verwijderen (fallback)
+Get-AppxPackage -AllUsers *LinkedIn* | Remove-AppxPackage -AllUsers -ErrorAction SilentlyContinue
+Get-AppxProvisionedPackage -Online | Where-Object {$_.PackageName -like "*LinkedIn*"} | Remove-AppxProvisionedPackage -Online -ErrorAction SilentlyContinue
 
+# Layout XML's (LinkedIn + Store pin)
 Write-Info "Cleaning default Start layout (LinkedIn/Store pins)..."
 
 $layoutFiles = @(
@@ -288,58 +374,56 @@ foreach ($file in $layoutFiles) {
     }
 }
 
+# Taskbar layout laten rebuilden
+reg delete "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Taskband" /f > $null
 
-# ============================================================================
-# 6. PERFORMANCE SERVICES (SysMain / DiagTrack)
-# ============================================================================
+Write-Info "Applying additional performance, privacy and Explorer tweaks..."
 
-Write-Info "Disabling SysMain and DiagTrack services..."
-
+# Disable SysMain (Superfetch)
+Write-Info "Disabling SysMain service..."
 Stop-Service SysMain -Force -ErrorAction SilentlyContinue
 Set-Service SysMain -StartupType Disabled
 
+# Disable Diagnostics Tracking service (DiagTrack)
+Write-Info "Disabling Diagnostics Tracking service..."
 Stop-Service DiagTrack -Force -ErrorAction SilentlyContinue
 Set-Service DiagTrack -StartupType Disabled
 
-
-# ============================================================================
-# 7. EXPLORER TWEAKS (Recent/Frequent items)
-# ============================================================================
-
+# Disable 'Recent files' and 'Frequent folders' in Explorer
 Write-Info "Disabling recent/frequent items in Explorer..."
 
+### DUPLICAAT — deze regel komt ook voor in Deel 2 (Recent/Frequent blok)
 reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer" /v ShowRecent /t REG_DWORD /d 0 /f > $null
+
+### DUPLICAAT — deze regel komt ook voor in Deel 2 (Recent/Frequent blok)
 reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer" /v ShowFrequent /t REG_DWORD /d 0 /f > $null
 
-# Disable "Recently added apps" in Start
+# Disable 'Recently added apps' in Start menu
 reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" /v Start_NotifyNewApps /t REG_DWORD /d 0 /f > $null
 
-# ============================================================================
-# 8. SMBv1 (legacy protocol) uitschakelen
-# ============================================================================
-
+# Disable SMBv1 (legacy, insecure protocol)
 Write-Info "Disabling SMBv1 protocol..."
 Disable-WindowsOptionalFeature -Online -FeatureName SMB1Protocol -NoRestart -ErrorAction SilentlyContinue
 
 
+# 7. VBS / CORE ISOLATION / SVCHOST SPLIT
 # ============================================================================
-# 9. VBS / CORE ISOLATION / HVCI
-# ============================================================================
+
 Write-Info "Disabling VBS / Core Isolation..."
 
-# Disable VBS
+# Virtualization-Based Security
 reg add "HKLM\System\CurrentControlSet\Control\DeviceGuard" /v EnableVirtualizationBasedSecurity /t REG_DWORD /d 0 /f > $null
 
-# Disable HVCI (Memory Integrity)
+# HVCI (Memory Integrity)
 reg add "HKLM\System\CurrentControlSet\Control\DeviceGuard\Scenarios\HypervisorEnforcedCodeIntegrity" /v Enabled /t REG_DWORD /d 0 /f > $null
 reg add "HKLM\System\CurrentControlSet\Control\DeviceGuard\Scenarios\HypervisorEnforcedCodeIntegrity" /v EnabledBootId /t REG_DWORD /d 0 /f > $null
 reg add "HKLM\System\CurrentControlSet\Control\DeviceGuard\Scenarios\HypervisorEnforcedCodeIntegrity" /v WasEnabledBy /t REG_DWORD /d 0 /f > $null
 
-# Increase SvcHost split threshold (performance)
+Write-Info "Applying SvcHostSplitThresholdInKB..."
 reg add "HKLM\SYSTEM\CurrentControlSet\Control" /v SvcHostSplitThresholdInKB /t REG_DWORD /d 67108864 /f > $null
 
-# ============================================================================
-# 10. LOCALE / TIMEZONE / LANGUAGE
+
+# 8. LOCALE, TIMEZONE, LANGUAGE
 # ============================================================================
 
 Write-Info "Setting locale/timezone to NL / W. Europe..."
@@ -351,9 +435,9 @@ Set-Culture nl-NL
 Set-WinHomeLocation -GeoId 176  # Nederland
 
 
+# 9. THEME / ACCENT COLOR
 # ============================================================================
-# 11. THEME / ACCENT COLOR
-# ============================================================================
+
 Write-Info "Applying dark theme & accent color..."
 
 $lightThemeSystem   = 0
@@ -361,14 +445,11 @@ $lightThemeApps     = 0
 $accentColorOnStart = 0
 $enableTransparency = 0
 $htmlAccentColor    = '#0078D4'   # Windows blauw
-
-# Apply theme settings
 reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize" /v SystemUsesLightTheme /t REG_DWORD /d $lightThemeSystem /f > $null
 reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize" /v AppsUseLightTheme   /t REG_DWORD /d $lightThemeApps /f > $null
 reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize" /v ColorPrevalence    /t REG_DWORD /d $accentColorOnStart /f > $null
 reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize" /v EnableTransparency /t REG_DWORD /d $enableTransparency /f > $null
 
-# Convert HTML color to DWORD
 try {
     Add-Type -AssemblyName 'System.Drawing'
     $accentColor = [System.Drawing.ColorTranslator]::FromHtml($htmlAccentColor)
@@ -379,48 +460,43 @@ try {
         return [System.BitConverter]::ToUInt32($bytes,0)
     }
 
-    # Apply accent color
     Set-ItemProperty -LiteralPath 'Registry::HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Accent' -Name 'StartColorMenu'  -Value (ConvertTo-DWord -Color $accentColor) -Type 'DWord' -Force
     Set-ItemProperty -LiteralPath 'Registry::HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Accent' -Name 'AccentColorMenu' -Value (ConvertTo-DWord -Color $accentColor) -Type 'DWord' -Force
     Set-ItemProperty -LiteralPath 'Registry::HKCU\Software\Microsoft\Windows\DWM' -Name 'AccentColor' -Value (ConvertTo-DWord -Color $accentColor) -Type 'DWord' -Force
 } catch {
-    Write-Warn "Accent color application failed — continuing..."
+    Write-Info "Accent color application failed — continuing..."
 }
+
+
+# 10. DEFAULT USER HIVE TWEAKS
 # ============================================================================
-# 12. DEFAULTUSER HIVE TWEAKS
-# ============================================================================
+
 Write-Info "Applying DefaultUser hive tweaks..."
 
 $defaultNtUser = "C:\Users\Default\NTUSER.DAT"
 
 if (Test-Path $defaultNtUser) {
-
-    # Mount DefaultUser hive
     reg load HKU\DefaultUser "$defaultNtUser" > $null
 
-    # Disable Copilot for new users
+    # Copilot uit voor nieuwe users
     reg add "HKU\DefaultUser\Software\Policies\Microsoft\Windows\WindowsCopilot" /v TurnOffWindowsCopilot /t REG_DWORD /d 1 /f > $null
 
-    # Disable Notepad Store banner
+    # Notepad store banner
     reg add "HKU\DefaultUser\Software\Microsoft\Notepad" /v ShowStoreBanner /t REG_DWORD /d 0 /f > $null
 
-    # Disable GameDVR
+    # GameDVR
     reg add "HKU\DefaultUser\Software\Microsoft\Windows\CurrentVersion\GameDVR" /v AppCaptureEnabled /t REG_DWORD /d 0 /f > $null
 
-    # Show file extensions
+    # Explorer defaults
     reg add "HKU\DefaultUser\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" /v HideFileExt /t REG_DWORD /d 0 /f > $null
 
-    # Hide Task View button
+    ### DUPLICAAT — deze regel komt ook voor in Deel 3 (Taskbar cleanup)
     reg add "HKU\DefaultUser\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" /v ShowTaskViewButton /t REG_DWORD /d 0 /f > $null
 
-    # Taskbar alignment left
+    ### DUPLICAAT — deze regel komt ook voor in Deel 3 (Taskbar alignment)
     reg add "HKU\DefaultUser\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" /v TaskbarAl /t REG_DWORD /d 0 /f > $null
 
-
-    # ============================================================================
-    # 13. CONTENT DELIVERY MANAGER DEFAULTS (ads, suggestions, bloat)
-    # ============================================================================
-
+    # ContentDeliveryManager defaults
     $cdmNames = @(
         'ContentDeliveryAllowed','FeatureManagementEnabled','OEMPreInstalledAppsEnabled',
         'PreInstalledAppsEnabled','PreInstalledAppsEverEnabled','SilentInstalledAppsEnabled',
@@ -430,67 +506,43 @@ if (Test-Path $defaultNtUser) {
         'SubscribedContent-353694Enabled','SubscribedContent-353696Enabled',
         'SubscribedContent-353698Enabled','SystemPaneSuggestionsEnabled'
     )
-
     foreach ($name in $cdmNames) {
+        ### DUPLICAAT — sommige van deze waarden komen ook voor in Deel 2 (CDM blok)
         reg add "HKU\DefaultUser\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager" /v $name /t REG_DWORD /d 0 /f > $null
     }
 
-
-    # ============================================================================
-    # 14. KEYBOARD & MOUSE DEFAULTS
-    # ============================================================================
-
-    # Enable NumLock by default
+    # Keyboard indicators (NumLock aan)
     foreach ($root in 'HKU\.DEFAULT','HKU\DefaultUser') {
         reg add "$root\Control Panel\Keyboard" /v InitialKeyboardIndicators /t REG_SZ /d 2 /f > $null
     }
 
-    # Disable mouse acceleration
+    # Mouse acceleration uit
     reg add "HKU\DefaultUser\Control Panel\Mouse" /v MouseSpeed      /t REG_SZ /d 0 /f > $null
     reg add "HKU\DefaultUser\Control Panel\Mouse" /v MouseThreshold1 /t REG_SZ /d 0 /f > $null
     reg add "HKU\DefaultUser\Control Panel\Mouse" /v MouseThreshold2 /t REG_SZ /d 0 /f > $null
 
-
-    # ============================================================================
-    # 15. SEARCH SUGGESTIONS (Bing in Start)
-    # ============================================================================
-
+    # Search suggestions uit
+    ### DUPLICAAT — deze regel komt ook voor in Deel 5 (DisableSearchBoxSuggestions)
     reg add "HKU\DefaultUser\Software\Policies\Microsoft\Windows\Explorer" /v DisableSearchBoxSuggestions /t REG_DWORD /d 1 /f > $null
 
-
-    # ============================================================================
-    # 16. TITLEBAR ACCENT COLOR
-    # ============================================================================
-
+    # Accentkleur op titelbalken uit
     reg add "HKU\DefaultUser\Software\Microsoft\Windows\DWM" /v ColorPrevalence /t REG_DWORD /d 0 /f > $null
 
-    # Unmount hive
     reg unload HKU\DefaultUser > $null
-
 } else {
-    Write-Warn "Default NTUSER.DAT not found — skipping DefaultUser tweaks."
+    Write-Info "Default NTUSER.DAT not found — skipping DefaultUser tweaks."
 }
 
+
+# 11. EDGE POLICIES + EU-CONDITIONAL EDGE REMOVAL
 # ============================================================================
-# 17. EDGE POLICIES
-# ============================================================================
+
 Write-Info "Applying Edge policies..."
 
-# Hide first-run experience
 reg add "HKLM\Software\Policies\Microsoft\Edge" /v HideFirstRunExperience /t REG_DWORD /d 1 /f > $null
-
-# Disable background mode
 reg add "HKLM\Software\Policies\Microsoft\Edge\Recommended" /v BackgroundModeEnabled /t REG_DWORD /d 0 /f > $null
-
-# Disable Startup Boost
 reg add "HKLM\Software\Policies\Microsoft\Edge\Recommended" /v StartupBoostEnabled /t REG_DWORD /d 0 /f > $null
-
-# Block forced update to Chromium Edge
 reg add "HKLM\Software\Policies\Microsoft\EdgeUpdate" /v DoNotUpdateToEdgeWithChromium /t REG_DWORD /d 1 /f > $null
-# ============================================================================
-# 17. EDGE REMOVAL (EU‑ONLY)
-# ============================================================================
-
 if ($IsEU) {
     Write-Info "EU build detected — removing Microsoft Edge browser..."
 
@@ -514,45 +566,40 @@ if ($IsEU) {
 }
 
 
+# 12. EXPLORER / SEARCH / CLASSIC CONTEXT MENU / WEB INTEGRATION
 # ============================================================================
-# 18. EXPLORER / SEARCH / CLASSIC CONTEXT MENU / WEB INTEGRATION
-# ============================================================================
+
 Write-Info "Applying Explorer tweaks..."
 
-# File Explorer opens to This PC
+# File Explorer naar This PC
 Set-ItemProperty -LiteralPath 'Registry::HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced' -Name 'LaunchTo' -Type DWord -Value 1
 
-# Hide search box in taskbar
+# Taskbar search box verbergen
+### DUPLICAAT — deze regel komt ook voor in Deel 3 (Taskbar cleanup)
 Set-ItemProperty -LiteralPath 'Registry::HKCU\Software\Microsoft\Windows\CurrentVersion\Search' -Name 'SearchboxTaskbarMode' -Type DWord -Value 0
 
-# Remove Edge desktop shortcuts
+# Edge desktop shortcuts weg
 $edgeLinkUser   = Join-Path $env:USERPROFILE "Desktop\Microsoft Edge.lnk"
 $edgeLinkPublic = "C:\Users\Public\Desktop\Microsoft Edge.lnk"
 Remove-Item -LiteralPath $edgeLinkUser   -ErrorAction SilentlyContinue
 Remove-Item -LiteralPath $edgeLinkPublic -ErrorAction SilentlyContinue
 
-# Enable classic context menu (Win11 → Win10 style)
+# Classic context menu (Win11)
 reg add "HKCU\Software\Classes\CLSID\{86ca1aa0-34aa-4e8b-a509-50c905bae2a2}\InprocServer32" /ve /f > $null
 
-# Disable Recommended section in Explorer Home
+# Explorer web integratie
 reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" /v ShowRecommendedSection /t REG_DWORD /d 0 /f > $null
-
-# Disable cloud files in Explorer Home
 reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" /v ShowCloudFilesInHome /t REG_DWORD /d 0 /f > $null
 
 
+# 13. ONEDRIVE FULL REMOVAL
 # ============================================================================
-# 19. ONEDRIVE FULL REMOVAL
-# ============================================================================
+
 Write-Info "Removing OneDrive completely..."
 
-# Kill running OneDrive processes
 taskkill /IM OneDrive.exe /F 2>$null
 
-# Remove AppX packages
 Get-AppxPackage -AllUsers *OneDrive* | Remove-AppxPackage -AllUsers -ErrorAction SilentlyContinue
-
-# Uninstall OneDrive via setup.exe (both 32-bit and 64-bit)
 if (Test-Path "$env:SystemRoot\SysWOW64\OneDriveSetup.exe") {
     & "$env:SystemRoot\SysWOW64\OneDriveSetup.exe" /uninstall
 }
@@ -560,82 +607,94 @@ if (Test-Path "$env:SystemRoot\System32\OneDriveSetup.exe") {
     & "$env:SystemRoot\System32\OneDriveSetup.exe" /uninstall
 }
 
-# Remove leftover folders
 Remove-Item "$env:LOCALAPPDATA\Microsoft\OneDrive" -Recurse -Force -ErrorAction SilentlyContinue
 Remove-Item "$env:PROGRAMDATA\Microsoft OneDrive" -Recurse -Force -ErrorAction SilentlyContinue
 Remove-Item "$env:USERPROFILE\OneDrive" -Recurse -Force -ErrorAction SilentlyContinue
 
-# Remove OneDrive autorun entry
 reg delete "HKCU\Software\Microsoft\Windows\CurrentVersion\Run" /v OneDrive /f 2>$null
 
-# Remove OneDrive from Explorer navigation pane
+# (optioneel) OneDrive uit de Explorer navigatieboom
 reg add "HKCR\CLSID\{018D5C66-4533-4307-9B53-224DE2ED1FE6}" /v System.IsPinnedToNameSpaceTree /t REG_DWORD /d 0 /f 2>$null
 
+
+# 14. EXTENDED PRIVACY / ANTI-AD / ANTI-CLOUD / ANTI-SPOTLIGHT / ANTI-RECALL
 # ============================================================================
-# 20. EXTENDED PRIVACY / ANTI-AD / ANTI-CLOUD / ANTI-SPOTLIGHT / ANTI-RECALL
-# ============================================================================
+
 Write-Info "Applying extended privacy and anti-advertising hardening..."
 
-# Disable suggested apps in Start (25H2)
+# Suggested apps in Start (25H2)
+### DUPLICAAT — deze regel komt ook voor in Deel 5 (onderaan extended privacy blok)
 reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" /v Start_IrisRecommendations /t REG_DWORD /d 0 /f > $null
 
-# Disable Online Service Experience Packs
+# Online Service Experience Packs
 reg add "HKLM\Software\Policies\Microsoft\Windows\System" /v AllowOnlineServiceExperience /t REG_DWORD /d 0 /f > $null
 
-# Disable Recall / AI data collection
+# Recall / AI
 reg add "HKLM\Software\Policies\Microsoft\Windows\WindowsAI" /v DisableAIDataCollection /t REG_DWORD /d 1 /f > $null
 reg add "HKLM\Software\Policies\Microsoft\Windows\WindowsAI" /v DisableAIRecall /t REG_DWORD /d 1 /f > $null
 
-# Disable Suggested Actions
+# Suggested Actions
 reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\SmartActionPlatform" /v Disabled /t REG_DWORD /d 1 /f > $null
 
-# Disable App Installer suggestions (Store MSIX)
+# App Installer suggestions (Store MSIX)
 reg add "HKLM\Software\Policies\Microsoft\Windows\Explorer" /v NoUseStoreOpenWith /t REG_DWORD /d 1 /f > $null
 
-# Disable web search in Start (Bing)
+# Web search in Start (Bing)
+### DUPLICAAT — deze regel komt ook voor in Deel 4 (DefaultUser hive)
 reg add "HKCU\Software\Policies\Microsoft\Windows\Explorer" /v DisableSearchBoxSuggestions /t REG_DWORD /d 1 /f > $null
 
-# Disable Cloud Content (ads in Settings, Start, lock screen)
+# Cloud Content (ads in Settings, Start, lock screen)
+### DUPLICAAT — deze regel komt ook voor in Deel 2 (CloudContent blok)
 reg add "HKLM\Software\Policies\Microsoft\Windows\CloudContent" /v DisableConsumerFeatures /t REG_DWORD /d 1 /f > $null
+
 reg add "HKLM\Software\Policies\Microsoft\Windows\CloudContent" /v DisableSoftLanding /t REG_DWORD /d 1 /f > $null
 
-# Disable Windows Spotlight everywhere
-reg add "HKCU\Software\Policies\Microsoft\Windows\CloudContent" /v DisableWindowsSpotlightFeatures        /t REG_DWORD /d 1 /f > $null
+# Windows Spotlight overal uit
+reg add "HKCU\Software\Policies\Microsoft\Windows\CloudContent" /v DisableWindowsSpotlightFeatures /t REG_DWORD /d 1 /f > $null
 reg add "HKCU\Software\Policies\Microsoft\Windows\CloudContent" /v DisableWindowsSpotlightOnActionCenter /t REG_DWORD /d 1 /f > $null
-reg add "HKCU\Software\Policies\Microsoft\Windows\CloudContent" /v DisableWindowsSpotlightOnSettings     /t REG_DWORD /d 1 /f > $null
-reg add "HKCU\Software\Policies\Microsoft\Windows\CloudContent" /v DisableWindowsSpotlightOnLockScreen   /t REG_DWORD /d 1 /f > $null
+reg add "HKCU\Software\Policies\Microsoft\Windows\CloudContent" /v DisableWindowsSpotlightOnSettings /t REG_DWORD /d 1 /f > $null
+reg add "HKCU\Software\Policies\Microsoft\Windows\CloudContent" /v DisableWindowsSpotlightOnLockScreen /t REG_DWORD /d 1 /f > $null
 
-# Disable automatic app reinstall
+# App prelaunch (Edge, Mail, Calendar)
+reg add "HKLM\Software\Policies\Microsoft\Windows\EdgeUI" /v AllowPrelaunch /t REG_DWORD /d 0 /f > $null
+
+# Automatic App reinstall
+### DUPLICAAT — deze regel komt ook voor in Deel 2 (CloudContent blok)
 reg add "HKLM\Software\Policies\Microsoft\Windows\CloudContent" /v DisableAutomaticAppInstall /t REG_DWORD /d 1 /f > $null
 
 # Extra Clipchamp/Teams removal (fallback)
 Get-AppxPackage -AllUsers *Clipchamp* | Remove-AppxPackage -AllUsers -ErrorAction SilentlyContinue
 Get-AppxPackage -AllUsers *MSTeams*   | Remove-AppxPackage -AllUsers -ErrorAction SilentlyContinue
 
-# Disable Windows Backup cloud prompts
+# Windows Backup cloud prompts
 reg add "HKLM\Software\Policies\Microsoft\Windows\System" /v DisableWindowsBackup /t REG_DWORD /d 1 /f > $null
 
+# Block WhatsApp/Messenger/TikTok/Spotify recommendations
+### DUPLICAAT — deze waarden komen ook voor in Deel 2 ($cdmKeys blok)
+reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager" /v SubscribedContent-353699Enabled /t REG_DWORD /d 0 /f > $null
+reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager" /v SubscribedContent-353700Enabled /t REG_DWORD /d 0 /f > $null
+reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager" /v PreInstalledAppsEnabled /t REG_DWORD /d 0 /f > $null
+reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager" /v PreInstalledAppsEverEnabled /t REG_DWORD /d 0 /f > $null
 
-# ============================================================================
-# 21. BLOCK WHATSAPP / MESSENGER / TIKTOK / SPOTIFY RECOMMENDATIONS
-# ============================================================================
-Write-Info "Blocking app recommendations (WhatsApp, TikTok, Spotify, Messenger)..."
+# Disable Get Started / Privacy Experience
+reg add "HKLM\Software\Policies\Microsoft\Windows\OOBE" /v DisablePrivacyExperience /t REG_DWORD /d 1 /f > $null
 
-$cdmBlock = "HKCU\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager"
-
-reg add $cdmBlock /v SubscribedContent-353699Enabled /t REG_DWORD /d 0 /f > $null
-reg add $cdmBlock /v SubscribedContent-353700Enabled /t REG_DWORD /d 0 /f > $null
-reg add $cdmBlock /v PreInstalledAppsEnabled           /t REG_DWORD /d 0 /f > $null
-reg add $cdmBlock /v PreInstalledAppsEverEnabled       /t REG_DWORD /d 0 /f > $null
+# Suggested apps in Start (25H2)
+### DUPLICAAT — deze regel komt ook voor in Deel 5 (bovenaan extended privacy blok)
+reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" /v Start_IrisRecommendations /t REG_DWORD /d 0 /f > $null
 
 Write-OK "Extended privacy and anti-advertising hardening applied."
+# 15. APPLICATION INSTALLATION (Chrome, 7-Zip, Notepad++) + DEFAULT BROWSER
 # ============================================================================
-# 23. APPLICATION INSTALLATION (Chrome, 7-Zip, Notepad++, Discord, Steam)
-# ============================================================================
+
+function Write-Info { param($m) Write-Host "[INFO]  $m" -ForegroundColor Cyan }
+function Write-OK   { param($m) Write-Host "[OK]    $m" -ForegroundColor Green }
+function Write-Warn { param($m) Write-Host "[WARN]  $m" -ForegroundColor Yellow }
+function Write-Err  { param($m) Write-Host "[ERROR] $m" -ForegroundColor Red }
 
 Write-Info "Checking required applications..."
 
-# Helper: detect installed apps via uninstall registry keys
+# Helper: Check if an app exists in uninstall registry (HKLM 64/32-bit and HKCU)
 function Test-AppInstalled {
     param([string]$Name)
 
@@ -653,30 +712,31 @@ function Test-AppInstalled {
                         return $true
                     }
                 }
-        } catch {}
+        } catch {
+            # ignore inaccessible keys
+        }
     }
     return $false
 }
 
-# ----------------------------------------------------------------------------
+# -------------------------
 # GOOGLE CHROME
-# ----------------------------------------------------------------------------
+# -------------------------
+$chromeInstalled = Test-AppInstalled "Google Chrome"
 
-if (-not (Test-AppInstalled "Google Chrome")) {
+if (-not $chromeInstalled) {
     Write-Info "Installing Google Chrome (silent)..."
     $chromeInstaller = Join-Path $env:TEMP 'chrome_installer.exe'
-
     try {
-        Invoke-WebRequest -Uri "https://dl.google.com/chrome/install/latest/chrome_installer.exe" `
-            -OutFile $chromeInstaller -UseBasicParsing -ErrorAction Stop
-
+        Invoke-WebRequest -Uri "https://dl.google.com/chrome/install/latest/chrome_installer.exe" -OutFile $chromeInstaller -UseBasicParsing -ErrorAction Stop
+        if (-not (Test-Path -Path $chromeInstaller)) { throw "Download failed: $chromeInstaller not found." }
         Start-Process -FilePath $chromeInstaller -ArgumentList "/silent","/install" -Wait -ErrorAction Stop
         Write-OK "Google Chrome installed."
 
-        # Set Chrome as default browser
+        # Set Chrome as default ONLY if it was installed now
         Write-Info "Setting Chrome as default browser..."
         $chromeExe = Join-Path $env:ProgramFiles 'Google\Chrome\Application\chrome.exe'
-        if (Test-Path $chromeExe) {
+        if (Test-Path -Path $chromeExe) {
             Start-Process -FilePath $chromeExe -ArgumentList '--make-default-browser'
             Write-OK "Chrome set as default browser."
         } else {
@@ -687,24 +747,22 @@ if (-not (Test-AppInstalled "Google Chrome")) {
         Write-Err "Failed to install Google Chrome: $($_.Exception.Message)"
     }
 } else {
-    Write-Info "Google Chrome already installed — skipping."
+    Write-Info "Google Chrome already installed — skipping installation and default-browser setup."
 }
 
-# ----------------------------------------------------------------------------
+# -------------------------
 # 7-ZIP
-# ----------------------------------------------------------------------------
+# -------------------------
 
+### DUPLICAAT — functioneel duplicaat: 7-Zip wordt ook geïnstalleerd in Deel 6
 if (-not (Test-AppInstalled "7-Zip")) {
     Write-Info "Installing 7-Zip (silent)..."
     $zipInstaller = Join-Path $env:TEMP '7zip_installer.exe'
-
     try {
-        Invoke-WebRequest -Uri "https://www.7-zip.org/a/7z2408-x64.exe" `
-            -OutFile $zipInstaller -UseBasicParsing -ErrorAction Stop
-
+        Invoke-WebRequest -Uri "https://www.7-zip.org/a/7z2408-x64.exe" -OutFile $zipInstaller -UseBasicParsing -ErrorAction Stop
+        if (-not (Test-Path -Path $zipInstaller)) { throw "Download failed: $zipInstaller not found." }
         Start-Process -FilePath $zipInstaller -ArgumentList "/S" -Wait -ErrorAction Stop
         Write-OK "7-Zip installed."
-
     } catch {
         Write-Err "Failed to install 7-Zip: $($_.Exception.Message)"
     }
@@ -712,10 +770,11 @@ if (-not (Test-AppInstalled "7-Zip")) {
     Write-Info "7-Zip already installed — skipping."
 }
 
-# ----------------------------------------------------------------------------
+# -------------------------
 # NOTEPAD++
-# ----------------------------------------------------------------------------
+# -------------------------
 
+### DUPLICAAT — functioneel duplicaat: Notepad++ wordt ook geïnstalleerd in Deel 6
 if (-not (Test-AppInstalled "Notepad++")) {
     Write-Info "Installing Notepad++ (silent)..."
 
@@ -724,35 +783,45 @@ if (-not (Test-AppInstalled "Notepad++")) {
 
     try {
         Write-Info "Fetching latest Notepad++ release info from GitHub API..."
+
+        # GitHub API requires a user-agent
         $headers = @{ "User-Agent" = "Mozilla/5.0" }
 
+        # Fetch JSON release data
         $release = Invoke-RestMethod -Uri $apiUrl -Headers $headers -ErrorAction Stop
 
+        # Find the correct installer asset
         $asset = $release.assets |
             Where-Object { $_.name -match "Installer.*x64.*\.exe$" } |
             Select-Object -First 1
 
-        if (-not $asset) { throw "Could not locate Notepad++ installer in GitHub API response." }
+        if (-not $asset) {
+            throw "Could not locate Notepad++ installer in GitHub API response."
+        }
 
         $nppUrl = $asset.browser_download_url
         Write-Info "Downloading Notepad++ from: $nppUrl"
 
+        # Download via BITS (very reliable)
         Start-BitsTransfer -Source $nppUrl -Destination $npInstaller -ErrorAction Stop
 
+        # Silent install
         Start-Process -FilePath $npInstaller -ArgumentList "/S" -Wait -ErrorAction Stop
         Write-OK "Notepad++ installed."
-
-    } catch {
+    }
+    catch {
         Write-Err "Failed to install Notepad++: $($_.Exception.Message)"
     }
-} else {
+}
+else {
     Write-Info "Notepad++ already installed — skipping."
 }
 
-# ----------------------------------------------------------------------------
+# -------------------------
 # DISCORD
-# ----------------------------------------------------------------------------
+# -------------------------
 
+### DUPLICAAT — functioneel duplicaat: Discord wordt ook geïnstalleerd in Deel 6
 if (-not (Test-AppInstalled "Discord")) {
     Write-Info "Installing Discord (silent)..."
 
@@ -760,6 +829,9 @@ if (-not (Test-AppInstalled "Discord")) {
     $discordUrl = "https://discord.com/api/download?platform=win"
 
     try {
+        Write-Info "Downloading Discord installer..."
+
+        # Force TLS 1.2 and spoof browser agent
         [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
         $headers = @{ "User-Agent" = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" }
 
@@ -767,30 +839,30 @@ if (-not (Test-AppInstalled "Discord")) {
 
         Start-Process -FilePath $discordInstaller -ArgumentList "/S" -Wait -ErrorAction Stop
         Write-OK "Discord installed."
-
-    } catch {
+    }
+    catch {
         Write-Err "Failed to install Discord: $($_.Exception.Message)"
     }
-} else {
+}
+else {
     Write-Info "Discord already installed — skipping."
 }
 
-# ----------------------------------------------------------------------------
+# -------------------------
 # STEAM
-# ----------------------------------------------------------------------------
+# -------------------------
 
+### DUPLICAAT — functioneel duplicaat: Steam wordt ook geïnstalleerd in Deel 6
 if (-not (Test-AppInstalled "Steam")) {
     Write-Info "Installing Steam (silent)..."
-
     $steamInstaller = Join-Path $env:TEMP 'steam_installer.exe'
     $steamUrl = "https://cdn.cloudflare.steamstatic.com/client/installer/SteamSetup.exe"
 
     try {
         Invoke-WebRequest -Uri $steamUrl -OutFile $steamInstaller -UseBasicParsing -ErrorAction Stop
-
+        if (-not (Test-Path -Path $steamInstaller)) { throw "Download failed: $steamInstaller not found." }
         Start-Process -FilePath $steamInstaller -ArgumentList "/S" -Wait -ErrorAction Stop
         Write-OK "Steam installed."
-
     } catch {
         Write-Err "Failed to install Steam: $($_.Exception.Message)"
     }
@@ -799,21 +871,21 @@ if (-not (Test-AppInstalled "Steam")) {
 }
 
 Write-OK "Application installation and configuration complete."
+# 16. TASKBAR CACHE CLEANUP + EXPLORER RESTART
 # ============================================================================
-# 24. TASKBAR CACHE CLEANUP
-# ============================================================================
+
 Write-Host "Cleaning taskbar cache..."
 
 $taskbarCache = Join-Path $env:LOCALAPPDATA "Microsoft\Windows\Explorer"
 
 try {
-    # Stop Explorer
+    # Stop explorer if running
     $expl = Get-Process -Name explorer -ErrorAction SilentlyContinue
     if ($expl) {
         Write-Host "Stopping Explorer..."
         $expl | Stop-Process -Force -ErrorAction Stop
 
-        # Wacht tot Explorer volledig gestopt is
+        # Wait for explorer to exit (timeout in seconds)
         $timeout = 10
         $sw = [Diagnostics.Stopwatch]::StartNew()
         while ((Get-Process -Name explorer -ErrorAction SilentlyContinue) -ne $null -and $sw.Elapsed.TotalSeconds -lt $timeout) {
@@ -821,8 +893,8 @@ try {
         }
     }
 
-    # Verwijder taskbar cache bestanden
-    if (Test-Path $taskbarCache) {
+    # Remove taskbar cache files if folder exists
+    if (Test-Path -Path $taskbarCache) {
         Write-Host "Removing taskbar cache files from $taskbarCache"
         Get-ChildItem -Path $taskbarCache -Filter "taskbar*.db" -File -ErrorAction SilentlyContinue |
             ForEach-Object {
@@ -837,10 +909,7 @@ try {
         Write-Host "Taskbar cache folder not found: $taskbarCache"
     }
 
-
-    # ============================================================================
-    # 25. EXPLORER SILENT RESTART
-    # ============================================================================
+    # Fully silent Explorer restart (no window opens)
     Write-Host "Restarting Explorer silently..."
 
     $signature = @"
@@ -877,10 +946,9 @@ public class RestartShell {
     Write-Error "Taskbar cleanup failed: $($_.Exception.Message)"
 }
 
+# 17. AUTOMATIC REBOOT WITH BANNER
+# ============================================================================
 
-# ============================================================================
-# 26. AUTOMATIC REBOOT WITH BANNER
-# ============================================================================
 $rebootDelay = 15
 
 Write-Host ""
@@ -896,4 +964,3 @@ Write-Host ""
 
 Start-Sleep -Seconds $rebootDelay
 shutdown /r /t 0
-
