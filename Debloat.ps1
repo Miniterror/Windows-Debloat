@@ -1,11 +1,6 @@
 # ============================================================================
 # 0. ADMIN CHECK, LOGGING, HELPER FUNCTIONS
 # ============================================================================
-# Dit blok controleert of het script als Administrator draait,
-# start logging op het bureaublad en definieert helper-functies
-# voor nette console-uitvoer.
-# ============================================================================
-
 # Controleer of script als Administrator draait
 $IsAdmin = ([Security.Principal.WindowsPrincipal] 
     [Security.Principal.WindowsIdentity]::GetCurrent()
@@ -35,9 +30,6 @@ Write-Info "Full SuperDebloat started at $(Get-Date)"
 
 # ============================================================================
 # 1. EU-DETECTIE (voor Edge-verwijdering)
-# ============================================================================
-# Windows 11 in de EU heeft speciale DMA-regels waardoor Edge volledig
-# verwijderd mag worden. Buiten de EU mag dat niet.
 # ============================================================================
 
 Write-Info "Checking if system is an EU-regulated build..."
@@ -71,12 +63,6 @@ else {
 Set-Variable -Name "IsEU" -Value $IsEU -Scope Global
 # ============================================================================
 # 2. APPX / PROVISIONED PACKAGE REMOVAL
-# ============================================================================
-# Dit blok verwijdert vooraf geïnstalleerde Windows Store apps (AppX) en
-# provisioned packages zodat ze ook voor nieuwe gebruikers niet terugkomen.
-#
-# Alle selectors zijn opgeschoond en samengevoegd.
-# Geen duplicaten meer.
 # ============================================================================
 
 function Remove-AppPackagesSelectors {
@@ -138,33 +124,12 @@ Remove-AppPackagesSelectors -Selectors $allAppxSelectors
 # ============================================================================
 # 3. PRIVACY & TELEMETRY HARDENING
 # ============================================================================
-# Dit blok bevat ALLE privacy-gerelateerde registry tweaks:
-# - Telemetry uitschakelen
-# - Activity History uitschakelen
-# - Advertising ID uitschakelen
-# - Cloud Clipboard uitschakelen
-# - Background Apps uitschakelen
-# - Tailored Experiences uitschakelen
-# - App Privacy Permissions blokkeren
-#
-# Alle duplicaten uit eerdere delen zijn verwijderd.
-# ============================================================================
-
-
-# ---------------------------------------------------------------------------
-# TELEMETRY (volledig uitschakelen)
-# ---------------------------------------------------------------------------
 
 # Disable telemetry (0 = Security only)
 reg add "HKLM\Software\Policies\Microsoft\Windows\DataCollection" /v AllowTelemetry /t REG_DWORD /d 0 /f > $null
 
 # Disable feedback notifications
 reg add "HKLM\Software\Policies\Microsoft\Windows\DataCollection" /v DoNotShowFeedbackNotifications /t REG_DWORD /d 1 /f > $null
-
-
-# ---------------------------------------------------------------------------
-# ACTIVITY HISTORY (Timeline)
-# ---------------------------------------------------------------------------
 
 # Disable Activity Feed
 reg add "HKLM\Software\Policies\Microsoft\Windows\System" /v EnableActivityFeed /t REG_DWORD /d 0 /f > $null
@@ -175,50 +140,19 @@ reg add "HKLM\Software\Policies\Microsoft\Windows\System" /v PublishUserActiviti
 # Prevent uploading activities to Microsoft
 reg add "HKLM\Software\Policies\Microsoft\Windows\System" /v UploadUserActivities /t REG_DWORD /d 0 /f > $null
 
-
-# ---------------------------------------------------------------------------
-# ADVERTISING ID
-# ---------------------------------------------------------------------------
-
 # Disable Advertising ID
 reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\AdvertisingInfo" /v Enabled /t REG_DWORD /d 0 /f > $null
 
-
-# ---------------------------------------------------------------------------
-# TAILORED EXPERIENCES (gepersonaliseerde advertenties)
-# ---------------------------------------------------------------------------
-
 reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Privacy" /v TailoredExperiencesWithDiagnosticDataEnabled /t REG_DWORD /d 0 /f > $null
-
-
-# ---------------------------------------------------------------------------
-# CLOUD CLIPBOARD
-# ---------------------------------------------------------------------------
 
 # Disable cloud clipboard sync
 reg add "HKCU\Software\Microsoft\Clipboard" /v CloudClipboard /t REG_DWORD /d 0 /f > $null
 
-
-# ---------------------------------------------------------------------------
-# BACKGROUND APPS
-# ---------------------------------------------------------------------------
-
 # Disable all background apps
 reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\BackgroundAccessApplications" /v GlobalUserDisabled /t REG_DWORD /d 1 /f > $null
 
-
-# ---------------------------------------------------------------------------
-# LOCATION SERVICES
-# ---------------------------------------------------------------------------
-
 # Disable location tracking
 reg add "HKLM\Software\Policies\Microsoft\Windows\LocationAndSensors" /v DisableLocation /t REG_DWORD /d 1 /f > $null
-
-
-# ---------------------------------------------------------------------------
-# APP PRIVACY PERMISSIONS (Camera, Microphone, Contacts, etc.)
-# 2 = Force deny
-# ---------------------------------------------------------------------------
 
 $AppPrivacy = "HKLM\Software\Policies\Microsoft\Windows\AppPrivacy"
 
@@ -248,12 +182,6 @@ foreach ($perm in $permissions) {
 # ============================================================================
 # 4. WINDOWS UPDATE & DRIVER POLICIES
 # ============================================================================
-# Dit blok bevat ALLE Windows Update gerelateerde instellingen:
-# - Geen driver updates via Windows Update
-# - Geen automatische app installs
-# - Delivery Optimization uitschakelen
-# - OneDrive sync uitschakelen
-# ============================================================================
 
 Write-Info "Applying Windows Update, Driver, DO and OneDrive policies..."
 
@@ -269,13 +197,9 @@ reg add "HKLM\Software\Policies\Microsoft\Windows\DeliveryOptimization" /v DODow
 # Disable OneDrive file sync
 reg add "HKLM\Software\Policies\Microsoft\Windows\OneDrive" /v DisableFileSyncNGSC /t REG_DWORD /d 1 /f > $null
 
-
 # ============================================================================
 # 5. COPILOT, WIDGETS, TASKBAR, START MENU
 # ============================================================================
-# Dit blok verwijdert Copilot, Widgets, en maakt de taakbalk en Start menu schoon.
-# ============================================================================
-
 Write-Info "Disabling Copilot, Widgets and cleaning Taskbar & Start..."
 
 # Disable Copilot (HKCU + HKLM)
@@ -293,11 +217,8 @@ reg add "HKLM\Software\Policies\Microsoft\Dsh" /v AllowNewsAndInterests /t REG_D
 Get-AppxPackage -AllUsers *WindowsWidgets* | Remove-AppxPackage -AllUsers -ErrorAction SilentlyContinue
 Get-AppxPackage -AllUsers *WebExperience* | Remove-AppxPackage -AllUsers -ErrorAction SilentlyContinue
 
-
 # ============================================================================
 # 6. TASKBAR CLEANUP
-# ============================================================================
-# Verwijdert taakbalkknoppen, tracking en andere rommel.
 # ============================================================================
 
 # Hide Task View button
@@ -336,8 +257,6 @@ schtasks /Change /TN "Microsoft\Windows\Shell\TaskbarLayoutModification" /Disabl
 # ============================================================================
 # 7. START MENU CLEANUP
 # ============================================================================
-# Leegt de Start menu layout via policy.
-# ============================================================================
 
 Write-Info "Clearing Start menu pins..."
 
@@ -346,9 +265,6 @@ New-Item -Path $keyStartPolicy -ItemType Directory -ErrorAction SilentlyContinue
 Set-ItemProperty -LiteralPath $keyStartPolicy -Name 'ConfigureStartPins' -Value '{"pinnedList":[]}' -Type String
 # ============================================================================
 # 5. LINKEDIN / STORE LAYOUT CLEANUP
-# ============================================================================
-# Verwijdert LinkedIn en Store pins uit layout XML's zodat nieuwe gebruikers
-# geen rommel in hun Start menu krijgen.
 # ============================================================================
 
 Write-Info "Cleaning default Start layout (LinkedIn/Store pins)..."
@@ -377,8 +293,6 @@ foreach ($file in $layoutFiles) {
 # ============================================================================
 # 6. PERFORMANCE SERVICES (SysMain / DiagTrack)
 # ============================================================================
-# SysMain (Superfetch) en DiagTrack (telemetry) worden uitgeschakeld.
-# ============================================================================
 
 Write-Info "Disabling SysMain and DiagTrack services..."
 
@@ -392,8 +306,6 @@ Set-Service DiagTrack -StartupType Disabled
 # ============================================================================
 # 7. EXPLORER TWEAKS (Recent/Frequent items)
 # ============================================================================
-# Verwijdert recente bestanden en veelgebruikte mappen uit Verkenner.
-# ============================================================================
 
 Write-Info "Disabling recent/frequent items in Explorer..."
 
@@ -402,7 +314,6 @@ reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer" /v ShowFrequen
 
 # Disable "Recently added apps" in Start
 reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" /v Start_NotifyNewApps /t REG_DWORD /d 0 /f > $null
-
 
 # ============================================================================
 # 8. SMBv1 (legacy protocol) uitschakelen
@@ -415,9 +326,6 @@ Disable-WindowsOptionalFeature -Online -FeatureName SMB1Protocol -NoRestart -Err
 # ============================================================================
 # 9. VBS / CORE ISOLATION / HVCI
 # ============================================================================
-# Schakelt Virtualization-Based Security en Memory Integrity uit.
-# ============================================================================
-
 Write-Info "Disabling VBS / Core Isolation..."
 
 # Disable VBS
@@ -430,7 +338,6 @@ reg add "HKLM\System\CurrentControlSet\Control\DeviceGuard\Scenarios\HypervisorE
 
 # Increase SvcHost split threshold (performance)
 reg add "HKLM\SYSTEM\CurrentControlSet\Control" /v SvcHostSplitThresholdInKB /t REG_DWORD /d 67108864 /f > $null
-
 
 # ============================================================================
 # 10. LOCALE / TIMEZONE / LANGUAGE
@@ -448,9 +355,6 @@ Set-WinHomeLocation -GeoId 176  # Nederland
 # ============================================================================
 # 11. THEME / ACCENT COLOR
 # ============================================================================
-# Donker thema + Windows blauw als accentkleur.
-# ============================================================================
-
 Write-Info "Applying dark theme & accent color..."
 
 $lightThemeSystem   = 0
@@ -486,10 +390,6 @@ try {
 # ============================================================================
 # 12. DEFAULTUSER HIVE TWEAKS
 # ============================================================================
-# Deze instellingen gelden voor ALLE nieuwe gebruikers die later worden aangemaakt.
-# We laden de NTUSER.DAT van het Default-profiel, passen tweaks toe en ontladen hem.
-# ============================================================================
-
 Write-Info "Applying DefaultUser hive tweaks..."
 
 $defaultNtUser = "C:\Users\Default\NTUSER.DAT"
@@ -572,14 +472,9 @@ if (Test-Path $defaultNtUser) {
     Write-Warn "Default NTUSER.DAT not found — skipping DefaultUser tweaks."
 }
 
-
 # ============================================================================
 # 17. EDGE POLICIES
 # ============================================================================
-# Verbergt first-run experience, schakelt background mode uit, en blokkeert
-# automatische updates naar Chromium Edge (indien toegestaan).
-# ============================================================================
-
 Write-Info "Applying Edge policies..."
 
 # Hide first-run experience
@@ -595,9 +490,6 @@ reg add "HKLM\Software\Policies\Microsoft\Edge\Recommended" /v StartupBoostEnabl
 reg add "HKLM\Software\Policies\Microsoft\EdgeUpdate" /v DoNotUpdateToEdgeWithChromium /t REG_DWORD /d 1 /f > $null
 # ============================================================================
 # 17. EDGE REMOVAL (EU‑ONLY)
-# ============================================================================
-# Windows 11 in de EU mag Edge volledig verwijderen vanwege DMA-regels.
-# Buiten de EU wordt dit overgeslagen.
 # ============================================================================
 
 if ($IsEU) {
@@ -626,13 +518,6 @@ if ($IsEU) {
 # ============================================================================
 # 18. EXPLORER / SEARCH / CLASSIC CONTEXT MENU / WEB INTEGRATION
 # ============================================================================
-# Dit blok bevat alle Explorer-gerelateerde tweaks:
-# - Classic context menu (Windows 10 stijl)
-# - Recommended section in Home uitschakelen
-# - Cloud files in Home uitschakelen
-# - Searchbox verbergen
-# ============================================================================
-
 Write-Info "Applying Explorer tweaks..."
 
 # File Explorer opens to This PC
@@ -660,15 +545,6 @@ reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" /v Sh
 # ============================================================================
 # 19. ONEDRIVE FULL REMOVAL
 # ============================================================================
-# Dit blok verwijdert OneDrive volledig:
-# - AppX removal
-# - Provisioned removal
-# - Setup.exe uninstall
-# - Folder cleanup
-# - Registry cleanup
-# - Explorer namespace cleanup
-# ============================================================================
-
 Write-Info "Removing OneDrive completely..."
 
 # Kill running OneDrive processes
@@ -695,23 +571,10 @@ reg delete "HKCU\Software\Microsoft\Windows\CurrentVersion\Run" /v OneDrive /f 2
 
 # Remove OneDrive from Explorer navigation pane
 reg add "HKCR\CLSID\{018D5C66-4533-4307-9B53-224DE2ED1FE6}" /v System.IsPinnedToNameSpaceTree /t REG_DWORD /d 0 /f 2>$null
+
 # ============================================================================
 # 20. EXTENDED PRIVACY / ANTI-AD / ANTI-CLOUD / ANTI-SPOTLIGHT / ANTI-RECALL
 # ============================================================================
-# Dit blok bevat ALLE extra privacy-hardening:
-# - Suggested apps uit
-# - Online Service Experience uit
-# - Recall / AI data collection uit
-# - Suggested Actions uit
-# - Store MSIX suggestions uit
-# - Web search in Start uit
-# - CloudContent ads uit
-# - Windows Spotlight overal uit
-# - Automatic App reinstall uit
-# - Extra bloat removal (Clipchamp, Teams)
-# - Windows Backup cloud prompts uit
-# ============================================================================
-
 Write-Info "Applying extended privacy and anti-advertising hardening..."
 
 # Disable suggested apps in Start (25H2)
@@ -757,9 +620,6 @@ reg add "HKLM\Software\Policies\Microsoft\Windows\System" /v DisableWindowsBacku
 # ============================================================================
 # 21. BLOCK WHATSAPP / MESSENGER / TIKTOK / SPOTIFY RECOMMENDATIONS
 # ============================================================================
-# Deze keys blokkeren promoties van populaire apps in Start / Settings.
-# ============================================================================
-
 Write-Info "Blocking app recommendations (WhatsApp, TikTok, Spotify, Messenger)..."
 
 $cdmBlock = "HKCU\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager"
@@ -772,14 +632,6 @@ reg add $cdmBlock /v PreInstalledAppsEverEnabled       /t REG_DWORD /d 0 /f > $n
 Write-OK "Extended privacy and anti-advertising hardening applied."
 # ============================================================================
 # 23. APPLICATION INSTALLATION (Chrome, 7-Zip, Notepad++, Discord, Steam)
-# ============================================================================
-# In jouw originele script stonden deze installers op meerdere plekken.
-# Hier zijn ze samengevoegd tot één nette sectie.
-#
-# Elke installer:
-# - controleert of de app al bestaat
-# - downloadt de installer
-# - voert een stille installatie uit
 # ============================================================================
 
 Write-Info "Checking required applications..."
@@ -951,10 +803,6 @@ Write-OK "Application installation and configuration complete."
 # ============================================================================
 # 24. TASKBAR CACHE CLEANUP
 # ============================================================================
-# Verwijdert taskbar database-bestanden zodat alle taakbalkwijzigingen
-# (pinnen, unpinnen, layout) correct worden toegepast.
-# ============================================================================
-
 Write-Host "Cleaning taskbar cache..."
 
 $taskbarCache = Join-Path $env:LOCALAPPDATA "Microsoft\Windows\Explorer"
@@ -994,9 +842,6 @@ try {
     # ============================================================================
     # 25. EXPLORER SILENT RESTART
     # ============================================================================
-    # Start Explorer opnieuw zonder dat er een venster opent.
-    # ============================================================================
-
     Write-Host "Restarting Explorer silently..."
 
     $signature = @"
@@ -1037,9 +882,6 @@ public class RestartShell {
 # ============================================================================
 # 26. AUTOMATIC REBOOT WITH BANNER
 # ============================================================================
-# Eindbanner + automatische reboot zodat ALLE wijzigingen worden toegepast.
-# ============================================================================
-
 $rebootDelay = 15
 
 Write-Host ""
