@@ -870,9 +870,16 @@ Write-Info "Setting custom wallpaper..."
 # Define paths
 $WallpaperUrl  = "https://wallpapercave.com/wp/wp14662630.jpg"
 $WallpaperPath = "$env:PUBLIC\Pictures\CustomWallpaper.jpg"
+$WallpaperPng  = "$env:PUBLIC\Pictures\CustomWallpaper.png"
 
 # Download the image
 Invoke-WebRequest -Uri $WallpaperUrl -OutFile $WallpaperPath -UseBasicParsing
+
+# Convert JPEG to PNG
+Add-Type -AssemblyName System.Drawing
+$image = [System.Drawing.Image]::FromFile($WallpaperPath)
+$image.Save($WallpaperPng, [System.Drawing.Imaging.ImageFormat]::Png)
+$image.Dispose()
 
 # Ensure Windows doesn't compress the wallpaper
 reg add "HKCU\Control Panel\Desktop" /v JPEGImportQuality /t REG_DWORD /d 100 /f > $null
@@ -881,7 +888,7 @@ reg add "HKCU\Control Panel\Desktop" /v JPEGImportQuality /t REG_DWORD /d 100 /f
 reg add "HKCU\Control Panel\Desktop" /v WallpaperStyle /t REG_SZ /d 10 /f > $null
 reg add "HKCU\Control Panel\Desktop" /v TileWallpaper /t REG_SZ /d 0 /f > $null
 
-# Apply wallpaper using SystemParametersInfo (avoids compression issues)
+# Apply wallpaper using SystemParametersInfo
 Add-Type @"
 using System.Runtime.InteropServices;
 public class Wallpaper {
@@ -889,9 +896,9 @@ public class Wallpaper {
     public static extern bool SystemParametersInfo(int uAction, int uParam, string lpvParam, int fuWinIni);
 }
 "@
-[Wallpaper]::SystemParametersInfo(20, 0, $WallpaperPath, 3)
+[Wallpaper]::SystemParametersInfo(20, 0, $WallpaperPng, 3)
 
-Write-OK "Custom wallpaper applied with full quality."
+Write-OK "Custom wallpaper applied with full quality (PNG)."
 
 # 17. TASKBAR CACHE CLEANUP + EXPLORER RESTART
 # ============================================================================
@@ -985,6 +992,7 @@ Write-Host ""
 
 Start-Sleep -Seconds $rebootDelay
 shutdown /r /t 0
+
 
 
 
