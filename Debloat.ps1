@@ -615,7 +615,8 @@ reg delete "HKCU\Software\Microsoft\Windows\CurrentVersion\Run" /v OneDrive /f 2
 # (optioneel) OneDrive uit de Explorer navigatieboom
 reg add "HKCR\CLSID\{018D5C66-4533-4307-9B53-224DE2ED1FE6}" /v System.IsPinnedToNameSpaceTree /t REG_DWORD /d 0 /f 2>$null
 
-# 14. APPLICATION INSTALLATION (Chrome, 7-Zip, Notepad++) + DEFAULT BROWSER
+# ============================================================================
+# 14. APPLICATION INSTALLATION (Chrome, 7-Zip, Notepad++, PuTTY, HWiNFO64, MSI Afterburner)
 # ============================================================================
 
 function Write-Info { param($m) Write-Host "[INFO]  $m" -ForegroundColor Cyan }
@@ -625,7 +626,7 @@ function Write-Err  { param($m) Write-Host "[ERROR] $m" -ForegroundColor Red }
 
 Write-Info "Checking required applications..."
 
-# Helper: Check if an app exists in uninstall registry (HKLM 64/32-bit and HKCU)
+# Helper: Check if an app exists in uninstall registry
 function Test-AppInstalled {
     param([string]$Name)
 
@@ -643,66 +644,77 @@ function Test-AppInstalled {
                         return $true
                     }
                 }
-        } catch {
-            # ignore inaccessible keys
-        }
+        } catch {}
     }
     return $false
 }
 
-# -------------------------
+# Helper: Delete installer file safely
+function Remove-Installer {
+    param([string]$file)
+    if (Test-Path $file) {
+        try {
+            Remove-Item $file -Force -ErrorAction Stop
+            Write-Info "Deleted installer: $file"
+        } catch {
+            Write-Warn "Could not delete installer: $file"
+        }
+    }
+}
+
+# ============================================================================
 # GOOGLE CHROME
-# -------------------------
+# ============================================================================
 $chromeInstalled = Test-AppInstalled "Google Chrome"
 
 if (-not $chromeInstalled) {
     Write-Info "Installing Google Chrome (silent)..."
     $chromeInstaller = Join-Path $env:TEMP 'chrome_installer.exe'
+
     try {
         Invoke-WebRequest -Uri "https://dl.google.com/chrome/install/latest/chrome_installer.exe" -OutFile $chromeInstaller -UseBasicParsing -ErrorAction Stop
-        if (-not (Test-Path -Path $chromeInstaller)) { throw "Download failed: $chromeInstaller not found." }
         Start-Process -FilePath $chromeInstaller -ArgumentList "/silent","/install" -Wait -ErrorAction Stop
         Write-OK "Google Chrome installed."
 
-        # Set Chrome as default ONLY if it was installed now
-        Write-Info "Setting Chrome as default browser..."
+        # Set Chrome as default
         $chromeExe = Join-Path $env:ProgramFiles 'Google\Chrome\Application\chrome.exe'
-        if (Test-Path -Path $chromeExe) {
+        if (Test-Path $chromeExe) {
             Start-Process -FilePath $chromeExe -ArgumentList '--make-default-browser'
             Write-OK "Chrome set as default browser."
-        } else {
-            Write-Warn "Chrome executable not found after installation."
         }
 
     } catch {
         Write-Err "Failed to install Google Chrome: $($_.Exception.Message)"
     }
+
+    Remove-Installer $chromeInstaller
 } else {
-    Write-Info "Google Chrome already installed — skipping installation and default-browser setup."
+    Write-Info "Google Chrome already installed — skipping."
 }
 
-# -------------------------
+# ============================================================================
 # 7-ZIP
-# -------------------------
+# ============================================================================
 if (-not (Test-AppInstalled "7-Zip")) {
     Write-Info "Installing 7-Zip (silent)..."
     $zipInstaller = Join-Path $env:TEMP '7zip_installer.exe'
+
     try {
         Invoke-WebRequest -Uri "https://www.7-zip.org/a/7z2408-x64.exe" -OutFile $zipInstaller -UseBasicParsing -ErrorAction Stop
-        if (-not (Test-Path -Path $zipInstaller)) { throw "Download failed: $zipInstaller not found." }
         Start-Process -FilePath $zipInstaller -ArgumentList "/S" -Wait -ErrorAction Stop
         Write-OK "7-Zip installed."
     } catch {
         Write-Err "Failed to install 7-Zip: $($_.Exception.Message)"
     }
+
+    Remove-Installer $zipInstaller
 } else {
     Write-Info "7-Zip already installed — skipping."
 }
 
-# -------------------------
+# ============================================================================
 # NOTEPAD++
-# -------------------------
-
+# ============================================================================
 if (-not (Test-AppInstalled "Notepad++")) {
     Write-Info "Installing Notepad++ (silent)..."
 
@@ -710,74 +722,53 @@ if (-not (Test-AppInstalled "Notepad++")) {
     $apiUrl = "https://api.github.com/repos/notepad-plus-plus/notepad-plus-plus/releases/latest"
 
     try {
-        Write-Info "Fetching latest Notepad++ release info from GitHub API..."
-
-        # GitHub API requires a user-agent
         $headers = @{ "User-Agent" = "Mozilla/5.0" }
-
-        # Fetch JSON release data
         $release = Invoke-RestMethod -Uri $apiUrl -Headers $headers -ErrorAction Stop
 
-        # Find the correct installer asset
         $asset = $release.assets |
             Where-Object { $_.name -match "Installer.*x64.*\.exe$" } |
             Select-Object -First 1
 
-        if (-not $asset) {
-            throw "Could not locate Notepad++ installer in GitHub API response."
-        }
-
         $nppUrl = $asset.browser_download_url
-        Write-Info "Downloading Notepad++ from: $nppUrl"
-
-        # Download via BITS (very reliable)
         Start-BitsTransfer -Source $nppUrl -Destination $npInstaller -ErrorAction Stop
 
-        # Silent install
         Start-Process -FilePath $npInstaller -ArgumentList "/S" -Wait -ErrorAction Stop
         Write-OK "Notepad++ installed."
     }
     catch {
         Write-Err "Failed to install Notepad++: $($_.Exception.Message)"
     }
-}
-else {
+
+    Remove-Installer $npInstaller
+} else {
     Write-Info "Notepad++ already installed — skipping."
 }
 
-# -------------------------
+# ============================================================================
 # DISCORD
-# -------------------------
-
+# ============================================================================
 if (-not (Test-AppInstalled "Discord")) {
     Write-Info "Installing Discord (silent)..."
-
     $discordInstaller = Join-Path $env:TEMP 'discord_installer.exe'
-    $discordUrl = "https://dl.discordapp.net/apps/win/0.0.309/DiscordSetup.exe"
+    $discordUrl = "https://discord.com/api/download?platform=win"
 
     try {
-        Write-Info "Downloading Discord installer..."
-
-        # Force TLS 1.2 and spoof browser agent
-        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-        $headers = @{ "User-Agent" = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" }
-
-        Invoke-WebRequest -Uri $discordUrl -OutFile $discordInstaller -Headers $headers -ErrorAction Stop
-
+        Invoke-WebRequest -Uri $discordUrl -OutFile $discordInstaller -ErrorAction Stop
         Start-Process -FilePath $discordInstaller -ArgumentList "/S" -Wait -ErrorAction Stop
         Write-OK "Discord installed."
     }
     catch {
         Write-Err "Failed to install Discord: $($_.Exception.Message)"
     }
-}
-else {
+
+    Remove-Installer $discordInstaller
+} else {
     Write-Info "Discord already installed — skipping."
 }
 
-# -------------------------
+# ============================================================================
 # STEAM
-# -------------------------
+# ============================================================================
 if (-not (Test-AppInstalled "Steam")) {
     Write-Info "Installing Steam (silent)..."
     $steamInstaller = Join-Path $env:TEMP 'steam_installer.exe'
@@ -785,18 +776,71 @@ if (-not (Test-AppInstalled "Steam")) {
 
     try {
         Invoke-WebRequest -Uri $steamUrl -OutFile $steamInstaller -UseBasicParsing -ErrorAction Stop
-        if (-not (Test-Path -Path $steamInstaller)) { throw "Download failed: $steamInstaller not found." }
         Start-Process -FilePath $steamInstaller -ArgumentList "/S" -Wait -ErrorAction Stop
         Write-OK "Steam installed."
     } catch {
         Write-Err "Failed to install Steam: $($_.Exception.Message)"
     }
+
+    Remove-Installer $steamInstaller
 } else {
     Write-Info "Steam already installed — skipping."
 }
 
-Write-OK "Application installation and configuration complete."
+# ============================================================================
+# PUTTY
+# ============================================================================
+if (-not (Test-AppInstalled "PuTTY")) {
+    Write-Info "Installing PuTTY (silent)..."
+    $puttyInstaller = Join-Path $env:TEMP 'putty.msi'
+    $puttyUrl = "https://the.earth.li/~sgtatham/putty/0.81/w64/putty-64bit-0.81-installer.msi"
 
+    try {
+        Invoke-WebRequest -Uri $puttyUrl -OutFile $puttyInstaller -ErrorAction Stop
+        Start-Process "msiexec.exe" -ArgumentList "/i `"$puttyInstaller`" /qn" -Wait
+        Write-OK "PuTTY installed."
+    } catch {
+        Write-Err "Failed to install PuTTY: $($_.Exception.Message)"
+    }
+
+    Remove-Installer $puttyInstaller
+} else {
+    Write-Info "PuTTY already installed — skipping."
+}
+
+# ============================================================================
+# HWiNFO64 (via Winget)
+# ============================================================================
+if (-not (Test-AppInstalled "HWiNFO64")) {
+    Write-Info "Installing HWiNFO64 via Winget (silent)..."
+    try {
+        winget install --id REALiX.HWiNFO --silent --accept-package-agreements --accept-source-agreements
+        Write-OK "HWiNFO64 installed."
+    }
+    catch {
+        Write-Err "Failed to install HWiNFO64: $($_.Exception.Message)"
+    }
+} else {
+    Write-Info "HWiNFO64 already installed — skipping."
+}
+
+# ============================================================================
+# MSI AFTERBURNER (via Winget)
+# ============================================================================
+if (-not (Test-AppInstalled "MSI Afterburner")) {
+    Write-Info "Installing MSI Afterburner via Winget (silent)..."
+    try {
+        winget install --id MSI.Afterburner --silent --accept-package-agreements --accept-source-agreements
+        Write-OK "MSI Afterburner installed."
+    }
+    catch {
+        Write-Err "Failed to install MSI Afterburner: $($_.Exception.Message)"
+    }
+} else {
+    Write-Info "MSI Afterburner already installed — skipping."
+}
+
+Write-OK "Application installation and configuration complete."
 # 15. TASKBAR CACHE CLEANUP + EXPLORER RESTART
 # ============================================================================
 Write-Host "Cleaning taskbar cache..."
@@ -889,5 +933,6 @@ Write-Host ""
 
 Start-Sleep -Seconds $rebootDelay
 shutdown /r /t 0
+
 
 
