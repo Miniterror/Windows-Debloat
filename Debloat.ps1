@@ -863,6 +863,51 @@ if (-not (Test-AppInstalled "HWiNFO64")) {
 }
 Write-OK "Application installation and configuration complete."
 
+# ============================================================================
+# ADB tools
+# ============================================================================
+Write-Info "Downloading and installing Android Platform Tools (ADB)..."
+
+# Define URL and paths
+$adbUrl   = "https://dl.google.com/android/repository/platform-tools-latest-windows.zip"
+$zipPath  = "$env:TEMP\platform-tools.zip"
+$tempPath = "$env:TEMP\platform-tools-temp"
+$destPath = "C:\ADB"
+
+try {
+    # Download the ZIP
+    Invoke-WebRequest -Uri $adbUrl -OutFile $zipPath -UseBasicParsing
+    Write-Host "Downloaded ADB package to $zipPath"
+
+    # Ensure temp and destination folders exist
+    if (Test-Path $tempPath) { Remove-Item $tempPath -Recurse -Force }
+    if (-not (Test-Path $destPath)) { New-Item -ItemType Directory -Path $destPath | Out-Null }
+
+    # Extract the ZIP into temp
+    Expand-Archive -Path $zipPath -DestinationPath $tempPath -Force
+    Write-Host "Extracted ADB tools to $tempPath"
+
+    # Move contents of inner 'platform-tools' folder into C:\ADB
+    Move-Item -Path "$tempPath\platform-tools\*" -Destination $destPath -Force
+    Write-Host "Moved ADB files to $destPath"
+
+    # Cleanup
+    Remove-Item $zipPath -Force
+    Remove-Item $tempPath -Recurse -Force
+    Write-Host "Cleaned up temporary files"
+
+    # (Optional) Add to PATH environment variable
+    $envPath = [System.Environment]::GetEnvironmentVariable("Path", "Machine")
+    if ($envPath -notlike "*$destPath*") {
+        [System.Environment]::SetEnvironmentVariable("Path", "$envPath;$destPath", "Machine")
+        Write-Host "Added $destPath to system PATH"
+    }
+
+    Write-OK "ADB tools installed successfully."
+} catch {
+    Write-Error "ADB installation failed: $($_.Exception.Message)"
+}
+
 # 16. DEFAULT WALLPAPER
 # ============================================================================
 Write-Info "Setting custom wallpaper..."
@@ -900,42 +945,7 @@ public class Wallpaper {
 
 Write-OK "Custom wallpaper applied with full quality (PNG)."
 
-# 17. ADB PLATFORM-TOOLS INSTALLATION
-# ============================================================================
-Write-Info "Downloading and installing Android Platform Tools (ADB)..."
-
-# Define URL and paths
-$adbUrl   = "https://dl.google.com/android/repository/platform-tools-latest-windows.zip"
-$zipPath  = "$env:TEMP\platform-tools.zip"
-$destPath = "C:\platform-tools"
-
-try {
-    # Download the ZIP
-    Invoke-WebRequest -Uri $adbUrl -OutFile $zipPath -UseBasicParsing
-    Write-Host "Downloaded ADB package to $zipPath"
-
-    # Extract the ZIP
-    Expand-Archive -Path $zipPath -DestinationPath $destPath -Force
-    Write-Host "Extracted ADB tools to $destPath"
-
-    # Remove the ZIP file after extraction
-    Remove-Item $zipPath -Force
-    Write-Host "Cleaned up temporary ZIP file"
-
-    # (Optional) Add to PATH environment variable
-    $envPath = [System.Environment]::GetEnvironmentVariable("Path", "Machine")
-    if ($envPath -notlike "*$destPath*") {
-        [System.Environment]::SetEnvironmentVariable("Path", "$envPath;$destPath", "Machine")
-        Write-Host "Added $destPath to system PATH"
-    }
-
-    Write-OK "ADB tools installed successfully."
-} catch {
-    Write-Error "ADB installation failed: $($_.Exception.Message)"
-}
-
-
-# 18. TASKBAR CACHE CLEANUP + EXPLORER RESTART
+# 17. TASKBAR CACHE CLEANUP + EXPLORER RESTART
 # ============================================================================
 Write-Host "Cleaning taskbar cache..."
 
@@ -1009,7 +1019,7 @@ public class RestartShell {
     Write-Error "Taskbar cleanup failed: $($_.Exception.Message)"
 }
 
-# 19. AUTOMATIC REBOOT WITH BANNER
+# 18. AUTOMATIC REBOOT WITH BANNER
 # ============================================================================
 
 $rebootDelay = 15
@@ -1027,3 +1037,4 @@ Write-Host ""
 
 Start-Sleep -Seconds $rebootDelay
 shutdown /r /t 0
+
