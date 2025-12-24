@@ -865,7 +865,6 @@ Write-OK "Application installation and configuration complete."
 
 # 16. DEFAULT WALLPAPER
 # ============================================================================
-
 Write-Info "Setting custom wallpaper..."
 
 # Define paths
@@ -875,15 +874,24 @@ $WallpaperPath = "$env:PUBLIC\Pictures\CustomWallpaper.jpg"
 # Download the image
 Invoke-WebRequest -Uri $WallpaperUrl -OutFile $WallpaperPath -UseBasicParsing
 
-# Set registry keys for wallpaper
-reg add "HKCU\Control Panel\Desktop" /v Wallpaper /t REG_SZ /d $WallpaperPath /f > $null
-reg add "HKCU\Control Panel\Desktop" /v WallpaperStyle /t REG_SZ /d 10 /f > $null   # 10 = Fill
+# Ensure Windows doesn't compress the wallpaper
+reg add "HKCU\Control Panel\Desktop" /v JPEGImportQuality /t REG_DWORD /d 100 /f > $null
+
+# Set wallpaper style (10 = Fill)
+reg add "HKCU\Control Panel\Desktop" /v WallpaperStyle /t REG_SZ /d 10 /f > $null
 reg add "HKCU\Control Panel\Desktop" /v TileWallpaper /t REG_SZ /d 0 /f > $null
 
-# Apply wallpaper immediately
-RUNDLL32.EXE user32.dll,UpdatePerUserSystemParameters
+# Apply wallpaper using SystemParametersInfo (avoids compression issues)
+Add-Type @"
+using System.Runtime.InteropServices;
+public class Wallpaper {
+    [DllImport("user32.dll", SetLastError = true)]
+    public static extern bool SystemParametersInfo(int uAction, int uParam, string lpvParam, int fuWinIni);
+}
+"@
+[Wallpaper]::SystemParametersInfo(20, 0, $WallpaperPath, 3)
 
-Write-OK "Custom wallpaper applied."
+Write-OK "Custom wallpaper applied with full quality."
 
 # 17. TASKBAR CACHE CLEANUP + EXPLORER RESTART
 # ============================================================================
@@ -977,6 +985,7 @@ Write-Host ""
 
 Start-Sleep -Seconds $rebootDelay
 shutdown /r /t 0
+
 
 
 
