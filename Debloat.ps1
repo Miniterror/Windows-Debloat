@@ -133,7 +133,42 @@ foreach ($selector in $features) {
         }
 }
 
-# 4. PRIVACY, TELEMETRY, DIAGNOSTICS, CONTENT DELIVERY
+# 4. POWER PLAN & POWER SETTINGS
+# ============================================================================
+Write-Info "Applying custom power plan settings..."
+
+# Get active power scheme
+$ActiveScheme = (powercfg /getactivescheme) -replace '.*GUID: ([a-f0-9\-]+).*','$1'
+
+#Turn off display -> Never (0 minutes)
+powercfg /setdcvalueindex $ActiveScheme SUB_VIDEO VIDEOIDLE $null
+powercfg /setacvalueindex $ActiveScheme SUB_VIDEO VIDEOIDLE $null
+powercfg /setdcvalueindex $ActiveScheme SUB_VIDEO VIDEOIDLE 0
+powercfg /setacvalueindex $ActiveScheme SUB_VIDEO VIDEOIDLE 0
+
+#Sleep -> Never (0 minutes)
+powercfg /setdcvalueindex $ActiveScheme SUB_SLEEP STANDBYIDLE 0
+powercfg /setacvalueindex $ActiveScheme SUB_SLEEP STANDBYIDLE 0
+
+#Disable Fast Startup
+Write-Info "Disabling Fast Startup..."
+reg add "HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Power" /v HiberbootEnabled /t REG_DWORD /d 0 /f > $null
+
+#Power button action -> Shut down (value 3)
+# Battery (DC) and Plugged in (AC)
+powercfg /setdcvalueindex $ActiveScheme SUB_BUTTONS PBUTTONACTION 3
+powercfg /setacvalueindex $ActiveScheme SUB_BUTTONS PBUTTONACTION 3
+
+#Lid close action -> Do nothing (value 0)
+powercfg /setdcvalueindex $ActiveScheme SUB_BUTTONS LIDACTION 0
+powercfg /setacvalueindex $ActiveScheme SUB_BUTTONS LIDACTION 0
+
+# Apply changes
+powercfg /setactive $ActiveScheme
+
+Write-OK "Custom power plan settings applied."
+
+# 5. PRIVACY, TELEMETRY, DIAGNOSTICS, CONTENT DELIVERY
 # ============================================================================
 
 Write-Info "Applying privacy & telemetry policies..."
@@ -285,7 +320,7 @@ reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager" 
 reg add "HKLM\Software\Policies\Microsoft\Windows\OOBE" /v DisablePrivacyExperience /t REG_DWORD /d 1 /f > $null
 
 Write-OK "Extended privacy and anti-advertising hardening applied."
-# 5. WINDOWS UPDATE, DRIVERS, ONEDRIVE, DELIVERY OPTIMIZATION
+# 6. WINDOWS UPDATE, DRIVERS, ONEDRIVE, DELIVERY OPTIMIZATION
 # ============================================================================
 
 Write-Info "Configuring Windows Update & driver policies..."
@@ -300,7 +335,7 @@ reg add "HKLM\Software\Policies\Microsoft\Windows\OneDrive" /v DisableFileSyncNG
 # Sync settings uitschakelen
 reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\SettingSync" /v SyncSettings /t REG_DWORD /d 0 /f > $null
 
-# 6. COPILOT, WIDGETS, TASKBAR, START, LAYOUT XML FIXES
+# 7. COPILOT, WIDGETS, TASKBAR, START, LAYOUT XML FIXES
 # ============================================================================
 
 Write-Info "Disabling Copilot and Widgets / cleaning Taskbar & Start..."
@@ -409,7 +444,7 @@ reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" /v St
 Write-Info "Disabling SMBv1 protocol..."
 Disable-WindowsOptionalFeature -Online -FeatureName SMB1Protocol -NoRestart -ErrorAction SilentlyContinue
 
-# 7. VBS / CORE ISOLATION / SVCHOST SPLIT
+# 8. VBS / CORE ISOLATION / SVCHOST SPLIT
 # ============================================================================
 
 Write-Info "Disabling VBS / Core Isolation..."
@@ -426,7 +461,7 @@ Write-Info "Applying SvcHostSplitThresholdInKB..."
 reg add "HKLM\SYSTEM\CurrentControlSet\Control" /v SvcHostSplitThresholdInKB /t REG_DWORD /d 67108864 /f > $null
 
 
-# 8. LOCALE, TIMEZONE, LANGUAGE
+# 9. LOCALE, TIMEZONE, LANGUAGE
 # ============================================================================
 
 Write-Info "Setting locale/timezone to NL / W. Europe..."
@@ -438,7 +473,7 @@ Set-Culture nl-NL
 Set-WinHomeLocation -GeoId 176  # Nederland
 
 
-# 9. THEME / ACCENT COLOR
+# 10. THEME / ACCENT COLOR
 # ============================================================================
 
 Write-Info "Applying dark theme & accent color..."
@@ -472,7 +507,7 @@ try {
 }
 
 
-# 10. DEFAULT USER HIVE TWEAKS
+# 11. DEFAULT USER HIVE TWEAKS
 # ============================================================================
 
 Write-Info "Applying DefaultUser hive tweaks..."
@@ -532,7 +567,7 @@ if (Test-Path $defaultNtUser) {
 }
 
 
-# 11. EDGE POLICIES + EU-CONDITIONAL EDGE REMOVAL
+# 12. EDGE POLICIES + EU-CONDITIONAL EDGE REMOVAL
 # ============================================================================
 
 Write-Info "Applying Edge policies..."
@@ -565,7 +600,7 @@ if ($IsEU) {
 }
 
 
-# 12. EXPLORER / SEARCH / CLASSIC CONTEXT MENU / WEB INTEGRATION
+# 13. EXPLORER / SEARCH / CLASSIC CONTEXT MENU / WEB INTEGRATION
 # ============================================================================
 
 Write-Info "Applying Explorer tweaks..."
@@ -590,7 +625,7 @@ reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" /v Sh
 reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" /v ShowCloudFilesInHome /t REG_DWORD /d 0 /f > $null
 
 
-# 13. ONEDRIVE FULL REMOVAL
+# 14. ONEDRIVE FULL REMOVAL
 # ============================================================================
 
 Write-Info "Removing OneDrive completely..."
@@ -616,7 +651,7 @@ reg delete "HKCU\Software\Microsoft\Windows\CurrentVersion\Run" /v OneDrive /f 2
 reg add "HKCR\CLSID\{018D5C66-4533-4307-9B53-224DE2ED1FE6}" /v System.IsPinnedToNameSpaceTree /t REG_DWORD /d 0 /f 2>$null
 
 # ============================================================================
-# 14. APPLICATION INSTALLATION (Chrome, 7-Zip, Notepad++, PuTTY, HWiNFO64, MSI Afterburner)
+# 15. APPLICATION INSTALLATION (Chrome, 7-Zip, Notepad++, PuTTY, HWiNFO64, MSI Afterburner)
 # ============================================================================
 
 function Write-Info { param($m) Write-Host "[INFO]  $m" -ForegroundColor Cyan }
@@ -823,25 +858,9 @@ if (-not (Test-AppInstalled "HWiNFO64")) {
 } else {
     Write-Info "HWiNFO64 already installed — skipping."
 }
-
-# ============================================================================
-# MSI AFTERBURNER (via Winget)
-# ============================================================================
-if (-not (Test-AppInstalled "MSI Afterburner")) {
-    Write-Info "Installing MSI Afterburner via Winget (silent)..."
-    try {
-        winget install --id MSI.Afterburner --silent --accept-package-agreements --accept-source-agreements
-        Write-OK "MSI Afterburner installed."
-    }
-    catch {
-        Write-Err "Failed to install MSI Afterburner: $($_.Exception.Message)"
-    }
-} else {
-    Write-Info "MSI Afterburner already installed — skipping."
-}
-
 Write-OK "Application installation and configuration complete."
-# 15. TASKBAR CACHE CLEANUP + EXPLORER RESTART
+
+# 16. TASKBAR CACHE CLEANUP + EXPLORER RESTART
 # ============================================================================
 Write-Host "Cleaning taskbar cache..."
 
@@ -915,7 +934,7 @@ public class RestartShell {
     Write-Error "Taskbar cleanup failed: $($_.Exception.Message)"
 }
 
-# 16. AUTOMATIC REBOOT WITH BANNER
+# 17. AUTOMATIC REBOOT WITH BANNER
 # ============================================================================
 
 $rebootDelay = 15
@@ -933,3 +952,4 @@ Write-Host ""
 
 Start-Sleep -Seconds $rebootDelay
 shutdown /r /t 0
+
