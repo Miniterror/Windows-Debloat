@@ -925,36 +925,36 @@ if (Test-Path $destPath) {
 # ============================================================================
 # Lenovo Legion Toolkit
 # ============================================================================
-Write-Info "Downloading and installing Lenovo Legion Toolkit from GitHub..."
+if (-not (Test-AppInstalled "Lenovo Legion Toolkit")) {
+    Write-Info "Downloading and installing Lenovo Legion Toolkit from GitHub..."
 
-# GitHub API for latest release
-$apiUrl = "https://api.github.com/repos/BartoszCichecki/LenovoLegionToolkit/releases/latest"
-$release = Invoke-RestMethod -Uri $apiUrl -UseBasicParsing
+    # GitHub API for latest release
+    $apiUrl = "https://api.github.com/repos/BartoszCichecki/LenovoLegionToolkit/releases/latest"
+    $release = Invoke-RestMethod -Uri $apiUrl -UseBasicParsing
 
-# Find the EXE asset
-$asset = $release.assets | Where-Object { $_.name -like "*.exe" } | Select-Object -First 1
-$downloadUrl = $asset.browser_download_url
-$installerPath = "$env:TEMP\$($asset.name)"
+    # Find the EXE asset
+    $asset = $release.assets | Where-Object { $_.name -like "*.exe" } | Select-Object -First 1
+    $downloadUrl = $asset.browser_download_url
+    $installerPath = "$env:TEMP\$($asset.name)"
 
-try {
-    # Download installer
-    Invoke-WebRequest -Uri $downloadUrl -OutFile $installerPath -UseBasicParsing
-    Write-Host "Downloaded installer to $installerPath"
+    try {
+        # Download installer
+        Invoke-WebRequest -Uri $downloadUrl -OutFile $installerPath -UseBasicParsing
+        Write-Host "Downloaded installer to $installerPath"
 
-    # Run installer silently (Inno Setup supports /VERYSILENT)
-    # Removed -Wait so script continues immediately
-    Start-Process -FilePath $installerPath -ArgumentList "/VERYSILENT /NORESTART"
+        # Run installer silently
+        Start-Process -FilePath $installerPath -ArgumentList "/VERYSILENT /NORESTART"
 
-    Write-OK "Lenovo Legion Toolkit installation started (running silently in background)."
+        Write-OK "Lenovo Legion Toolkit installation started (running silently in background)."
 
-    # Optional: give installer a few seconds before cleanup
-    Start-Sleep -Seconds 5
-
-    # Cleanup
-    Remove-Item $installerPath -Force
-    Write-Host "Deleted installer file"
-} catch {
-    Write-Error "Installation failed: $($_.Exception.Message)"
+        Start-Sleep -Seconds 5
+        Remove-Item $installerPath -Force
+        Write-Host "Deleted installer file"
+    } catch {
+        Write-Error "Installation failed: $($_.Exception.Message)"
+    }
+} else {
+    Write-Info "Lenovo Legion Toolkit already installed — skipping."
 }
 
 # 16. DEFAULT WALLPAPER
@@ -1086,6 +1086,7 @@ Write-Host ""
 
 Start-Sleep -Seconds $rebootDelay
 shutdown /r /t 0
+
 
 
 
