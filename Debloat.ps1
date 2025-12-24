@@ -908,6 +908,37 @@ try {
     Write-Error "ADB installation failed: $($_.Exception.Message)"
 }
 
+# ============================================================================
+# Lenovo Legion Toolkit
+# ============================================================================
+Write-Info "Downloading and installing Lenovo Legion Toolkit from GitHub..."
+
+# GitHub API for latest release
+$apiUrl = "https://api.github.com/repos/BartoszCichecki/LenovoLegionToolkit/releases/latest"
+$release = Invoke-RestMethod -Uri $apiUrl -UseBasicParsing
+
+# Find the EXE asset
+$asset = $release.assets | Where-Object { $_.name -like "*.exe" } | Select-Object -First 1
+$downloadUrl = $asset.browser_download_url
+$installerPath = "$env:TEMP\$($asset.name)"
+
+try {
+    # Download installer
+    Invoke-WebRequest -Uri $downloadUrl -OutFile $installerPath -UseBasicParsing
+    Write-Host "Downloaded installer to $installerPath"
+
+    # Run installer silently (EXE flags vary; Lenovo Legion Toolkit supports /S)
+    Start-Process -FilePath $installerPath -ArgumentList "/S" -Wait
+
+    Write-OK "Lenovo Legion Toolkit installed successfully."
+
+    # Cleanup
+    Remove-Item $installerPath -Force
+    Write-Host "Deleted installer file"
+} catch {
+    Write-Error "Installation failed: $($_.Exception.Message)"
+}
+
 # 16. DEFAULT WALLPAPER
 # ============================================================================
 Write-Info "Setting custom wallpaper..."
@@ -1037,6 +1068,7 @@ Write-Host ""
 
 Start-Sleep -Seconds $rebootDelay
 shutdown /r /t 0
+
 
 
 
