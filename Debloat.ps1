@@ -921,17 +921,19 @@ if (-not (Test-AppInstalled "Discord")) {
     Write-Info "Discord already installed — skipping."
 }
 
-# -------------------------
-# STEAM
-# -------------------------
 if (-not (Test-AppInstalled "Steam")) {
 
     if (Ask-Install "Steam") {
 
         Write-Info "Installing Steam (silent)..."
         $steamInstaller = Join-Path $env:TEMP 'steam_installer.exe'
-        $steam
-}
+
+        Invoke-WebRequest -Uri "https://steamcdn-a.akamaihd.net/client/installer/SteamSetup.exe" -OutFile $steamInstaller
+
+        Start-Process -FilePath $steamInstaller -ArgumentList "/S" -Wait
+
+        Remove-Item $steamInstaller -Force
+    }
 }
 # 16. TASKBAR CACHE CLEANUP + EXPLORER RESTART
 # ============================================================================
@@ -1025,5 +1027,6 @@ Write-Host ""
 
 Start-Sleep -Seconds $rebootDelay
 shutdown /r /t 0
+
 
 
