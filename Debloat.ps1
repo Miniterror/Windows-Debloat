@@ -135,38 +135,70 @@ foreach ($selector in $features) {
 
 # 4. POWER PLAN & POWER SETTINGS
 # ============================================================================
-Write-Info "Applying custom power plan settings..."
+Write-Host "Applying custom power plan settings..." -ForegroundColor Cyan
 
 # Get active power scheme
 $ActiveScheme = (powercfg /getactivescheme) -replace '.*GUID: ([a-f0-9\-]+).*','$1'
 
-#Turn off display -> Never (0 minutes)
-powercfg /setdcvalueindex $ActiveScheme SUB_VIDEO VIDEOIDLE $null
-powercfg /setacvalueindex $ActiveScheme SUB_VIDEO VIDEOIDLE $null
-powercfg /setdcvalueindex $ActiveScheme SUB_VIDEO VIDEOIDLE 0
-powercfg /setacvalueindex $ActiveScheme SUB_VIDEO VIDEOIDLE 0
+# Helper function to ask for AC/DC values
+function Ask-Setting {
+    param(
+        [string]$Prompt,
+        [string]$SubGroup,
+        [string]$Setting
+    )
 
-#Sleep -> Never (0 minutes)
-powercfg /setdcvalueindex $ActiveScheme SUB_SLEEP STANDBYIDLE 0
-powercfg /setacvalueindex $ActiveScheme SUB_SLEEP STANDBYIDLE 0
+    Write-Host ""
+    Write-Host "=== $Prompt ===" -ForegroundColor Yellow
+    $dc = Read-Host "Enter value for Battery (DC)"
+    $ac = Read-Host "Enter value for Plugged in (AC)"
 
-#Disable Fast Startup
-Write-Info "Disabling Fast Startup..."
-reg add "HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Power" /v HiberbootEnabled /t REG_DWORD /d 0 /f > $null
+    powercfg /setdcvalueindex $ActiveScheme $SubGroup $Setting $dc
+    powercfg /setacvalueindex $ActiveScheme $SubGroup $Setting $ac
+}
 
-#Power button action -> Shut down (value 3)
-# Battery (DC) and Plugged in (AC)
-powercfg /setdcvalueindex $ActiveScheme SUB_BUTTONS PBUTTONACTION 3
-powercfg /setacvalueindex $ActiveScheme SUB_BUTTONS PBUTTONACTION 3
+# Turn off display
+Ask-Setting -Prompt "Turn off display (minutes, 0 = Never)" `
+            -SubGroup "SUB_VIDEO" `
+            -Setting "VIDEOIDLE"
 
-#Lid close action -> Do nothing (value 0)
-powercfg /setdcvalueindex $ActiveScheme SUB_BUTTONS LIDACTION 0
-powercfg /setacvalueindex $ActiveScheme SUB_BUTTONS LIDACTION 0
+# Sleep
+Ask-Setting -Prompt "Sleep timeout (minutes, 0 = Never)" `
+            -SubGroup "SUB_SLEEP" `
+            -Setting "STANDBYIDLE"
+
+# Fast Startup
+Write-Host ""
+Write-Host "=== Fast Startup ===" -ForegroundColor Yellow
+$fast = Read-Host "Disable Fast Startup? (yes/no)"
+if ($fast -eq "yes") {
+    reg add "HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Power" /v HiberbootEnabled /t REG_DWORD /d 0 /f > $null
+    Write-Host "Fast Startup disabled."
+} else {
+    Write-Host "Fast Startup unchanged."
+}
+
+# Power button action
+Write-Host ""
+Write-Host "=== Power Button Action ===" -ForegroundColor Yellow
+Write-Host "Options: 0 = Do nothing, 1 = Sleep, 2 = Hibernate, 3 = Shut down"
+$pb = Read-Host "Enter desired action"
+powercfg /setdcvalueindex $ActiveScheme SUB_BUTTONS PBUTTONACTION $pb
+powercfg /setacvalueindex $ActiveScheme SUB_BUTTONS PBUTTONACTION $pb
+
+# Lid close action
+Write-Host ""
+Write-Host "=== Lid Close Action ===" -ForegroundColor Yellow
+Write-Host "Options: 0 = Do nothing, 1 = Sleep, 2 = Hibernate, 3 = Shut down"
+$lid = Read-Host "Enter desired action"
+powercfg /setdcvalueindex $ActiveScheme SUB_BUTTONS LIDACTION $lid
+powercfg /setacvalueindex $ActiveScheme SUB_BUTTONS LIDACTION $lid
 
 # Apply changes
 powercfg /setactive $ActiveScheme
 
-Write-OK "Custom power plan settings applied."
+Write-Host ""
+Write-Host "All settings applied!" -ForegroundColor Green
 
 # 5. PRIVACY, TELEMETRY, DIAGNOSTICS, CONTENT DELIVERY
 # ============================================================================
@@ -1105,6 +1137,7 @@ Write-Host ""
 
 Start-Sleep -Seconds $rebootDelay
 shutdown /r /t 0
+
 
 
 
