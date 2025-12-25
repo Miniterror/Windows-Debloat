@@ -551,20 +551,18 @@ Write-Info "Disabling SMBv1 protocol..."
 Disable-WindowsOptionalFeature -Online -FeatureName SMB1Protocol -NoRestart -ErrorAction SilentlyContinue
 
 Write-Info "Applying controller compatibility fixes (ms-gamebar suppression)..."
-# Disable Game Bar controller features
-reg add "HKCU\Software\Microsoft\GameBar" /v UseControllerRemapping /t REG_DWORD /d 0 /f > $null
-reg add "HKCU\Software\Microsoft\GameBar" /v AllowAutoGameMode /t REG_DWORD /d 0 /f > $null
 
-# Suppress ms-gamebar protocol at user level
-reg add "HKCU\Software\Microsoft\Windows\Shell\Associations\UrlAssociations\ms-gamebar\UserChoice" /v ProgId /t REG_SZ /d "NoGameBar" /f > $null
+reg add "HKCU\Software\Microsoft\GameBar" /v UseControllerRemapping /t REG_DWORD /d 0 /f | Out-Null
+reg add "HKCU\Software\Microsoft\GameBar" /v AllowAutoGameMode /t REG_DWORD /d 0 /f | Out-Null
 
-# Suppress ms-gamebar protocol at system level
-reg add "HKCR\ms-gamebar" /ve /t REG_SZ /d "NoGameBar" /f > $null
-reg add "HKCR\ms-gamebar\shell" /f > $null
-reg add "HKCR\ms-gamebar\shell\open" /f > $null
+reg add "HKCU\Software\Microsoft\Windows\Shell\Associations\UrlAssociations\ms-gamebar\UserChoice" /v ProgId /t REG_SZ /d "NoGameBar" /f | Out-Null
 
-# Empty command handler (PowerShell-safe via CMD)
-reg add "HKCR\ms-gamebar\shell\open\command" /ve /t REG_SZ /d "" /f > $null
+$base = "HKCU\Software\Classes\ms-gamebar"
+
+reg add "$base" /ve /t REG_SZ /d "NoGameBar" /f | Out-Null
+reg add "$base\shell" /ve /t REG_SZ /d "" /f | Out-Null
+reg add "$base\shell\open" /ve /t REG_SZ /d "" /f | Out-Null
+reg add "$base\shell\open\command" /ve /t REG_SZ /d "" /f | Out-Null
 
 Write-OK "Controller popup suppression applied."
 
@@ -941,7 +939,7 @@ switch ($browserChoice) {
 if (-not (Test-AppInstalled "7-Zip")) {
     $choice = Read-Host "7-Zip not found. Do you want to install 7-Zip? (Y/N)"
     if ($choice -eq "Y") {
-        Write-Info "Installing 7-Zip (silent)..."
+        Write-Info "Installing 7-Zip..."
         $zipInstaller = Join-Path $env:TEMP '7zip_installer.exe'
 
         try {
@@ -966,7 +964,7 @@ if (-not (Test-AppInstalled "7-Zip")) {
 if (-not (Test-AppInstalled "Notepad++")) {
     $choice = Read-Host "Notepad++ not found. Do you want to install Notepad++? (Y/N)"
     if ($choice -eq "Y") {
-        Write-Info "Installing Notepad++ (silent)..."
+        Write-Info "Installing Notepad++..."
 
         $npInstaller = Join-Path $env:TEMP 'npp_installer.exe'
         $apiUrl = "https://api.github.com/repos/notepad-plus-plus/notepad-plus-plus/releases/latest"
@@ -1002,7 +1000,7 @@ if (-not (Test-AppInstalled "Notepad++")) {
 if (-not (Test-AppInstalled "Discord")) {
     $choice = Read-Host "Discord not found. Do you want to install Discord? (Y/N)"
     if ($choice -eq "Y") {
-        Write-Info "Installing Discord (silent)..."
+        Write-Info "Installing Discord..."
         $discordInstaller = Join-Path $env:TEMP 'discord_installer.exe'
         $discordUrl = "https://discord.com/api/download?platform=win"
 
@@ -1029,7 +1027,7 @@ if (-not (Test-AppInstalled "Discord")) {
 if (-not (Test-AppInstalled "Steam")) {
     $choice = Read-Host "Steam not found. Do you want to install Steam? (Y/N)"
     if ($choice -eq "Y") {
-        Write-Info "Installing Steam (silent)..."
+        Write-Info "Installing Steam..."
         $steamInstaller = Join-Path $env:TEMP 'steam_installer.exe'
         $steamUrl = "https://cdn.cloudflare.steamstatic.com/client/installer/SteamSetup.exe"
 
@@ -1055,7 +1053,7 @@ if (-not (Test-AppInstalled "Steam")) {
 if (-not (Test-AppInstalled "PuTTY")) {
     $choice = Read-Host "PuTTY not found. Do you want to install PuTTY? (Y/N)"
     if ($choice -eq "Y") {
-        Write-Info "Installing PuTTY (silent)..."
+        Write-Info "Installing PuTTY..."
         $puttyInstaller = Join-Path $env:TEMP 'putty.msi'
         $puttyUrl = "https://the.earth.li/~sgtatham/putty/0.81/w64/putty-64bit-0.81-installer.msi"
 
@@ -1081,7 +1079,7 @@ if (-not (Test-AppInstalled "PuTTY")) {
 if (-not (Test-AppInstalled "HWiNFO64")) {
     $choice = Read-Host "HWiNFO64 not found. Do you want to install HWiNFO64? (Y/N)"
     if ($choice -eq "Y") {
-        Write-Info "Installing HWiNFO64 via Winget (silent)..."
+        Write-Info "Installing HWiNFO64..."
         try {
             winget install --id REALiX.HWiNFO --silent --accept-package-agreements --accept-source-agreements
             Write-OK "HWiNFO64 installed."
@@ -1294,7 +1292,7 @@ public class RestartShell {
         [ref]$result
     ) | Out-Null
 
-    Write-Host "Explorer restarted successfully (silent)."
+    Write-Host "Explorer restarted successfully."
 
 } catch {
     Write-Error "Taskbar cleanup failed: $($_.Exception.Message)"
@@ -1318,6 +1316,7 @@ Write-Host ""
 
 Start-Sleep -Seconds $rebootDelay
 shutdown /r /t 0
+
 
 
 
