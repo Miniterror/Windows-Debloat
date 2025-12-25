@@ -720,38 +720,112 @@ function Remove-Installer {
 }
 
 # ============================================================================
-# GOOGLE CHROME
+# BROWSER INSTALLATION (Chrome / Firefox / Brave)
 # ============================================================================
-$chromeInstalled = Test-AppInstalled "Google Chrome"
 
-if (-not $chromeInstalled) {
-    $choice = Read-Host "Google Chrome not found. Do you want to install Google Chrome? (Y/N)"
-    if ($choice -eq "Y") {
-        Write-Info "Installing Google Chrome (silent)..."
-        $chromeInstaller = Join-Path $env:TEMP 'chrome_installer.exe'
+Write-Host ""
+Write-Host "=== Browser Installation ===" -ForegroundColor Yellow
+Write-Host "Choose a browser to install:"
+Write-Host "1 = Google Chrome"
+Write-Host "2 = Mozilla Firefox"
+Write-Host "3 = Brave Browser"
+Write-Host "0 = Skip"
+$browserChoice = Read-Host "Enter your choice (0-3)"
 
-        try {
-            Invoke-WebRequest -Uri "https://dl.google.com/chrome/install/latest/chrome_installer.exe" -OutFile $chromeInstaller -UseBasicParsing -ErrorAction Stop
-            Start-Process -FilePath $chromeInstaller -ArgumentList "/silent","/install" -Wait -ErrorAction Stop
-            Write-OK "Google Chrome installed."
+switch ($browserChoice) {
 
-            # Set Chrome as default
-            $chromeExe = Join-Path $env:ProgramFiles 'Google\Chrome\Application\chrome.exe'
-            if (Test-Path $chromeExe) {
-                Start-Process -FilePath $chromeExe -ArgumentList '--make-default-browser'
-                Write-OK "Chrome set as default browser."
+    # ---------------------------------------------------------
+    # GOOGLE CHROME
+    # ---------------------------------------------------------
+    "1" {
+        if (-not (Test-AppInstalled "Google Chrome")) {
+            Write-Info "Installing Google Chrome..."
+            $installer = Join-Path $env:TEMP "chrome_installer.exe"
+
+            try {
+                Invoke-WebRequest -Uri "https://dl.google.com/chrome/install/latest/chrome_installer.exe" `
+                    -OutFile $installer -UseBasicParsing -ErrorAction Stop
+
+                Start-Process -FilePath $installer -ArgumentList "/silent","/install" -Wait -ErrorAction Stop
+                Write-OK "Google Chrome installed."
+
+                # Set Chrome as default
+                $chromeExe = "$env:ProgramFiles\Google\Chrome\Application\chrome.exe"
+                if (Test-Path $chromeExe) {
+                    Start-Process -FilePath $chromeExe -ArgumentList '--make-default-browser'
+                    Write-OK "Chrome set as default browser."
+                }
+
+            } catch {
+                Write-Err "Chrome installation failed: $($_.Exception.Message)"
             }
 
-        } catch {
-            Write-Err "Failed to install Google Chrome: $($_.Exception.Message)"
+            Remove-Installer $installer
+        } else {
+            Write-Info "Google Chrome already installed — skipping."
         }
-
-        Remove-Installer $chromeInstaller
-    } else {
-        Write-Info "Skipped installing Google Chrome."
     }
-} else {
-    Write-Info "Google Chrome already installed — skipping."
+
+    # ---------------------------------------------------------
+    # MOZILLA FIREFOX
+    # ---------------------------------------------------------
+    "2" {
+        if (-not (Test-AppInstalled "Mozilla Firefox")) {
+            Write-Info "Installing Mozilla Firefox..."
+            $installer = Join-Path $env:TEMP "firefox_installer.exe"
+
+            try {
+                Invoke-WebRequest -Uri "https://download.mozilla.org/?product=firefox-latest&os=win64&lang=en-US" `
+                    -OutFile $installer -UseBasicParsing -ErrorAction Stop
+
+                Start-Process -FilePath $installer -ArgumentList "/S" -Wait -ErrorAction Stop
+                Write-OK "Mozilla Firefox installed."
+
+            } catch {
+                Write-Err "Firefox installation failed: $($_.Exception.Message)"
+            }
+
+            Remove-Installer $installer
+        } else {
+            Write-Info "Mozilla Firefox already installed — skipping."
+        }
+    }
+
+    # ---------------------------------------------------------
+    # BRAVE BROWSER
+    # ---------------------------------------------------------
+    "3" {
+        if (-not (Test-AppInstalled "Brave")) {
+            Write-Info "Installing Brave Browser..."
+            $installer = Join-Path $env:TEMP "brave_installer.exe"
+
+            try {
+                Invoke-WebRequest -Uri "https://laptop-updates.brave.com/latest/winx64" `
+                    -OutFile $installer -UseBasicParsing -ErrorAction Stop
+
+                Start-Process -FilePath $installer -ArgumentList "/silent","/install" -Wait -ErrorAction Stop
+                Write-OK "Brave Browser installed."
+
+            } catch {
+                Write-Err "Brave installation failed: $($_.Exception.Message)"
+            }
+
+            Remove-Installer $installer
+        } else {
+            Write-Info "Brave Browser already installed — skipping."
+        }
+    }
+
+    # ---------------------------------------------------------
+    # SKIP
+    # ---------------------------------------------------------
+    "0" {
+        Write-Info "Skipping browser installation."
+    }
+
+    default {
+        Write-Warn "Invalid choice — skipping browser installation."
+    }
 }
 
 # ============================================================================
@@ -1137,6 +1211,7 @@ Write-Host ""
 
 Start-Sleep -Seconds $rebootDelay
 shutdown /r /t 0
+
 
 
 
