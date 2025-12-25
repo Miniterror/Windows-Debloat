@@ -468,7 +468,7 @@ switch ($taskbarChoice) {
 
 Write-Host "You may need to restart Explorer for the change to take effect." -ForegroundColor Cyan
 
-# Taskbar pins folder leegmaken
+## Taskbar pins folder leegmaken
 $taskbarPins = "$env:APPDATA\Microsoft\Internet Explorer\Quick Launch\User Pinned\TaskBar"
 if (Test-Path $taskbarPins) {
     Write-Info "Clearing taskbar pins..."
@@ -483,8 +483,11 @@ $shell = New-Object -ComObject Shell.Application
 $item = $shell.Namespace((Split-Path $explorerPath)).ParseName((Split-Path $explorerPath -Leaf))
 $item.InvokeVerb($verb)
 
-# Repinning task uitschakelen
-schtasks /Change /TN "Microsoft\Windows\Shell\TaskbarLayoutModification" /Disable 2>$null
+# Repinning task uitschakelen (alleen als deze bestaat)
+$taskName = "Microsoft\Windows\Shell\TaskbarLayoutModification"
+if (schtasks /Query /TN $taskName 2>$null) {
+    schtasks /Change /TN $taskName /Disable 2>$null
+}
 
 # Start menu pins via policy
 Write-Info "Clearing Start menu pins..."
@@ -1315,6 +1318,7 @@ Write-Host ""
 
 Start-Sleep -Seconds $rebootDelay
 shutdown /r /t 0
+
 
 
 
