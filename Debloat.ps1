@@ -450,20 +450,17 @@ Disable-WindowsOptionalFeature -Online -FeatureName SMB1Protocol -NoRestart -Err
 
 Write-Info "Applying controller compatibility fixes (ms-gamebar suppression)..."
 
-# Disable Game Bar controller features
-reg add "HKCU\Software\Microsoft\GameBar" /v UseControllerRemapping /t REG_DWORD /d 0 /f > $null
-reg add "HKCU\Software\Microsoft\GameBar" /v AllowAutoGameMode /t REG_DWORD /d 0 /f > $null
+reg add "HKCU\Software\Microsoft\GameBar" /v UseControllerRemapping /t REG_DWORD /d 0 /f | Out-Null
+reg add "HKCU\Software\Microsoft\GameBar" /v AllowAutoGameMode /t REG_DWORD /d 0 /f | Out-Null
 
-# Suppress ms-gamebar protocol at user level
-reg add "HKCU\Software\Microsoft\Windows\Shell\Associations\UrlAssociations\ms-gamebar\UserChoice" /v ProgId /t REG_SZ /d "NoGameBar" /f > $null
+reg add "HKCU\Software\Microsoft\Windows\Shell\Associations\UrlAssociations\ms-gamebar\UserChoice" /v ProgId /t REG_SZ /d "NoGameBar" /f | Out-Null
 
-# Write to the REAL hive instead of HKCR
 $base = "HKCU\Software\Classes\ms-gamebar"
 
-reg add "$base" /ve /t REG_SZ /d "NoGameBar" /f > $null
-reg add "$base\shell" /ve /t REG_SZ /d "" /f > $null
-reg add "$base\shell\open" /ve /t REG_SZ /d "" /f > $null
-reg add "$base\shell\open\command" /ve /t REG_SZ /d "" /f > $null
+reg add "$base" /ve /t REG_SZ /d "NoGameBar" /f | Out-Null
+reg add "$base\shell" /ve /t REG_SZ /d "" /f | Out-Null
+reg add "$base\shell\open" /ve /t REG_SZ /d "" /f | Out-Null
+reg add "$base\shell\open\command" /ve /t REG_SZ /d "" /f | Out-Null
 
 Write-OK "Controller popup suppression applied."
 
@@ -1106,6 +1103,7 @@ Write-Host ""
 
 Start-Sleep -Seconds $rebootDelay
 shutdown /r /t 0
+
 
 
 
