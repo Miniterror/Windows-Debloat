@@ -141,8 +141,6 @@ Write-Info "Applying custom power plan settings..."
 $ActiveScheme = (powercfg /getactivescheme) -replace '.*GUID: ([a-f0-9\-]+).*','$1'
 
 #Turn off display -> Never (0 minutes)
-powercfg /setdcvalueindex $ActiveScheme SUB_VIDEO VIDEOIDLE $null
-powercfg /setacvalueindex $ActiveScheme SUB_VIDEO VIDEOIDLE $null
 powercfg /setdcvalueindex $ActiveScheme SUB_VIDEO VIDEOIDLE 0
 powercfg /setacvalueindex $ActiveScheme SUB_VIDEO VIDEOIDLE 0
 
@@ -451,6 +449,7 @@ Write-Info "Disabling SMBv1 protocol..."
 Disable-WindowsOptionalFeature -Online -FeatureName SMB1Protocol -NoRestart -ErrorAction SilentlyContinue
 
 Write-Info "Applying controller compatibility fixes (ms-gamebar suppression)..."
+
 # Disable Game Bar controller features
 reg add "HKCU\Software\Microsoft\GameBar" /v UseControllerRemapping /t REG_DWORD /d 0 /f > $null
 reg add "HKCU\Software\Microsoft\GameBar" /v AllowAutoGameMode /t REG_DWORD /d 0 /f > $null
@@ -460,12 +459,11 @@ reg add "HKCU\Software\Microsoft\Windows\Shell\Associations\UrlAssociations\ms-g
 
 # Suppress ms-gamebar protocol at system level
 reg add "HKCR\ms-gamebar" /ve /t REG_SZ /d "NoGameBar" /f > $null
-reg add "HKCR\ms-gamebar\shell" /f > $null
-reg add "HKCR\ms-gamebar\shell\open" /f > $null
+reg add "HKCR\ms-gamebar\shell" /ve /t REG_SZ /d "" /f > $null
+reg add "HKCR\ms-gamebar\shell\open" /ve /t REG_SZ /d "" /f > $null
 
-# Empty command handler (PowerShell-safe via CMD)
+# Empty command handler
 reg add "HKCR\ms-gamebar\shell\open\command" /ve /t REG_SZ /d "" /f > $null
-
 Write-OK "Controller popup suppression applied."
 
 # 8. VBS / CORE ISOLATION / SVCHOST SPLIT
@@ -1107,6 +1105,7 @@ Write-Host ""
 
 Start-Sleep -Seconds $rebootDelay
 shutdown /r /t 0
+
 
 
 
