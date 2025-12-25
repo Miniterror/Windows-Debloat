@@ -1048,6 +1048,37 @@ if (-not (Test-AppInstalled "Steam")) {
 }
 
 # ============================================================================
+# EPIC GAMES LAUNCHER
+# ============================================================================
+if (-not (Test-AppInstalled "Epic Games Launcher")) {
+    $choice = Read-Host "Epic Games Launcher not found. Do you want to install it? (Y/N)"
+    if ($choice -eq "Y") {
+        Write-Info "Installing Epic Games Launcher..."
+
+        $epicInstaller = Join-Path $env:TEMP 'EpicInstaller.msi'
+        $epicUrl = "https://launcher-public-service-prod06.ol.epicgames.com/launcher/api/installer/download/EpicGamesLauncherInstaller.msi"
+
+        try {
+            Invoke-WebRequest -Uri $epicUrl -OutFile $epicInstaller -UseBasicParsing -ErrorAction Stop
+
+            # Silent MSI install
+            Start-Process "msiexec.exe" -ArgumentList "/i `"$epicInstaller`" /qn" -Wait -ErrorAction Stop
+
+            Write-OK "Epic Games Launcher installed."
+        }
+        catch {
+            Write-Err "Failed to install Epic Games Launcher: $($_.Exception.Message)"
+        }
+
+        Remove-Installer $epicInstaller
+    } else {
+        Write-Info "Skipped installing Epic Games Launcher."
+    }
+} else {
+    Write-Info "Epic Games Launcher already installed — skipping."
+}
+
+# ============================================================================
 # PUTTY
 # ============================================================================
 if (-not (Test-AppInstalled "PuTTY")) {
@@ -1316,6 +1347,7 @@ Write-Host ""
 
 Start-Sleep -Seconds $rebootDelay
 shutdown /r /t 0
+
 
 
 
