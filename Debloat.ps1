@@ -1022,6 +1022,29 @@ if (-not (Test-AppInstalled "Discord")) {
 }
 
 # ============================================================================
+# GOG GALAXY LAUNCHER
+# ============================================================================
+if (-not (Test-AppInstalled "GOG Galaxy")) {
+    $choice = Read-Host "GOG Galaxy Launcher not found. Do you want to install it? (Y/N)"
+    if ($choice -eq "Y") {
+        Write-Info "Installing GOG Galaxy Launcher..."
+
+        try {
+            winget install --id GOG.Galaxy --silent --accept-package-agreements --accept-source-agreements
+            Write-OK "GOG Galaxy Launcher installed."
+        }
+        catch {
+            Write-Err "Failed to install GOG Galaxy Launcher: $($_.Exception.Message)"
+        }
+
+    } else {
+        Write-Info "Skipped installing GOG Galaxy Launcher."
+    }
+} else {
+    Write-Info "GOG Galaxy Launcher already installed — skipping."
+}
+
+# ============================================================================
 # STEAM
 # ============================================================================
 if (-not (Test-AppInstalled "Steam")) {
@@ -1218,6 +1241,29 @@ if (-not (Test-AppInstalled "Lenovo Legion Toolkit")) {
     Write-Info "Lenovo Legion Toolkit already installed — skipping."
 }
 
+# ============================================================================
+# REVO UNINSTALLER
+# ============================================================================
+if (-not (Test-AppInstalled "Revo Uninstaller")) {
+    $choice = Read-Host "Revo Uninstaller not found. Do you want to install Revo Uninstaller? (Y/N)"
+    if ($choice -eq "Y") {
+        Write-Info "Installing Revo Uninstaller..."
+
+        try {
+            winget install --id VSRevoGroup.RevoUninstaller --silent --accept-package-agreements --accept-source-agreements
+            Write-OK "Revo Uninstaller installed."
+        }
+        catch {
+            Write-Err "Failed to install Revo Uninstaller: $($_.Exception.Message)"
+        }
+
+    } else {
+        Write-Info "Skipped installing Revo Uninstaller."
+    }
+} else {
+    Write-Info "Revo Uninstaller already installed — skipping."
+}
+
 # 15. DEFAULT WALLPAPER
 # ============================================================================
 Write-Info "Setting custom wallpaper..."
@@ -1347,6 +1393,7 @@ Write-Host ""
 
 Start-Sleep -Seconds $rebootDelay
 shutdown /r /t 0
+
 
 
 
