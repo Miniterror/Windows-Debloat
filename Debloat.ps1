@@ -1278,6 +1278,40 @@ if (-not (Test-AppInstalled "Revo Uninstaller")) {
     Write-Info "Revo Uninstaller already installed — skipping."
 }
 
+# ============================================================================
+# O&O SHUTUP10++
+# ============================================================================
+if (-not (Test-AppInstalled "ShutUp10")) {
+    $choice = Read-Host "O&O ShutUp10++ not found. Do you want to install it? Tweaks are already done by the script. (Y/N)"
+    if ($choice -eq "Y") {
+        Write-Info "Installing O&O ShutUp10++..."
+
+        $destPath = "C:\ShutUp10"
+        $exePath  = Join-Path $destPath "OOSU10.exe"
+        $downloadUrl = "https://dl5.oo-software.com/files/ooshutup10/OOSU10.exe"
+
+        try {
+            # Create folder if missing
+            if (-not (Test-Path $destPath)) {
+                New-Item -ItemType Directory -Path $destPath | Out-Null
+            }
+
+            # Download EXE directly into C:\
+            Invoke-WebRequest -Uri $downloadUrl -OutFile $exePath -UseBasicParsing -ErrorAction Stop
+
+            Write-OK "O&O ShutUp10++ downloaded to $destPath"
+        }
+        catch {
+            Write-Err "Failed to install O&O ShutUp10++: $($_.Exception.Message)"
+        }
+
+    } else {
+        Write-Info "Skipped installing O&O ShutUp10++."
+    }
+} else {
+    Write-Info "O&O ShutUp10++ already installed — skipping."
+}
+
 # 15. DEFAULT WALLPAPER
 # ============================================================================
 Write-Info "Setting custom wallpaper..."
@@ -1407,6 +1441,7 @@ Write-Host ""
 
 Start-Sleep -Seconds $rebootDelay
 shutdown /r /t 0
+
 
 
 
