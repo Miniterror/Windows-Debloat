@@ -561,6 +561,24 @@ reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" /v St
 Write-Info "Disabling SMBv1 protocol..."
 Disable-WindowsOptionalFeature -Online -FeatureName SMB1Protocol -NoRestart -ErrorAction SilentlyContinue
 
+Write-Info "Applying controller compatibility fixes (ms-gamebar suppression)..."
+# Disable Game Bar controller features
+reg add "HKCU\Software\Microsoft\GameBar" /v UseControllerRemapping /t REG_DWORD /d 0 /f > $null
+reg add "HKCU\Software\Microsoft\GameBar" /v AllowAutoGameMode /t REG_DWORD /d 0 /f > $null
+
+# Suppress ms-gamebar protocol at user level
+reg add "HKCU\Software\Microsoft\Windows\Shell\Associations\UrlAssociations\ms-gamebar\UserChoice" /v ProgId /t REG_SZ /d "NoGameBar" /f > $null
+
+# Suppress ms-gamebar protocol at system level
+reg add "HKCR\ms-gamebar" /ve /t REG_SZ /d "NoGameBar" /f > $null
+reg add "HKCR\ms-gamebar\shell" /f > $null
+reg add "HKCR\ms-gamebar\shell\open" /f > $null
+
+# Empty command handler (PowerShell-safe via CMD)
+reg add "HKCR\ms-gamebar\shell\open\command" /ve /t REG_SZ /d "" /f > $null
+
+Write-OK "Controller popup suppression applied."
+
 # 8. VBS / CORE ISOLATION / SVCHOST SPLIT
 # ============================================================================
 
@@ -1311,6 +1329,7 @@ Write-Host ""
 
 Start-Sleep -Seconds $rebootDelay
 shutdown /r /t 0
+
 
 
 
