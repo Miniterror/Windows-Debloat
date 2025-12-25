@@ -495,22 +495,40 @@ reg add "HKLM\System\CurrentControlSet\Control\DeviceGuard\Scenarios\HypervisorE
 Write-Info "Applying SvcHostSplitThresholdInKB..."
 reg add "HKLM\SYSTEM\CurrentControlSet\Control" /v SvcHostSplitThresholdInKB /t REG_DWORD /d 67108864 /f > $null
 
-# 9. THEME / ACCENT COLOR
+# ============================================================================
+# 9. THEME / ACCENT COLOR (Interactive)
 # ============================================================================
 
-Write-Info "Applying dark theme & accent color..."
+Write-Host ""
+Write-Host "=== Windows Theme Selection ===" -ForegroundColor Yellow
+$themeChoice = Read-Host "Do you want to enable Dark Mode? (Y/N)"
 
-$lightThemeSystem   = 0
-$lightThemeApps     = 0
-$accentColorOnStart = 0
-$enableTransparency = 0
-$htmlAccentColor    = '#0078D4'   # Windows blauw
+if ($themeChoice -eq "Y") {
+    Write-Info "Applying dark theme & accent color..."
 
+    $lightThemeSystem   = 0
+    $lightThemeApps     = 0
+    $accentColorOnStart = 0
+    $enableTransparency = 0
+    $htmlAccentColor    = '#0078D4'   # Windows blue
+
+} else {
+    Write-Info "Applying light theme & accent color..."
+
+    $lightThemeSystem   = 1
+    $lightThemeApps     = 1
+    $accentColorOnStart = 1
+    $enableTransparency = 1
+    $htmlAccentColor    = '#0078D4'   # Same accent color
+}
+
+# Apply theme settings
 reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize" /v SystemUsesLightTheme /t REG_DWORD /d $lightThemeSystem /f > $null
 reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize" /v AppsUseLightTheme   /t REG_DWORD /d $lightThemeApps /f > $null
 reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize" /v ColorPrevalence    /t REG_DWORD /d $accentColorOnStart /f > $null
 reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize" /v EnableTransparency /t REG_DWORD /d $enableTransparency /f > $null
 
+# Apply accent color
 try {
     Add-Type -AssemblyName 'System.Drawing'
     $accentColor = [System.Drawing.ColorTranslator]::FromHtml($htmlAccentColor)
@@ -524,10 +542,10 @@ try {
     Set-ItemProperty -LiteralPath 'Registry::HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Accent' -Name 'StartColorMenu'  -Value (ConvertTo-DWord -Color $accentColor) -Type 'DWord' -Force
     Set-ItemProperty -LiteralPath 'Registry::HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Accent' -Name 'AccentColorMenu' -Value (ConvertTo-DWord -Color $accentColor) -Type 'DWord' -Force
     Set-ItemProperty -LiteralPath 'Registry::HKCU\Software\Microsoft\Windows\DWM' -Name 'AccentColor' -Value (ConvertTo-DWord -Color $accentColor) -Type 'DWord' -Force
+
 } catch {
     Write-Info "Accent color application failed — continuing..."
 }
-
 
 # 10. DEFAULT USER HIVE TWEAKS
 # ============================================================================
@@ -1211,6 +1229,7 @@ Write-Host ""
 
 Start-Sleep -Seconds $rebootDelay
 shutdown /r /t 0
+
 
 
 
