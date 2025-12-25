@@ -164,36 +164,16 @@ foreach ($selector in $features) {
         }
 }
 
-# 4. POWER PLAN & POWER SETTINGS
 # ============================================================================
+# POWER PLAN & POWER SETTINGS (CLEAN VERSION)
+# ============================================================================
+
 Write-Host "Applying custom power plan settings..." -ForegroundColor Cyan
 
-# Get active power scheme
+# Get active power scheme GUID
 $ActiveScheme = (powercfg /getactivescheme) -replace '.*GUID: ([a-f0-9\-]+).*','$1'
 
-# Helper: enforce AC/DC timeout values directly in registry
-function Set-Timeout-Forced {
-    param(
-        [string]$SubGroup,
-        [string]$Setting,
-        [int]$DC_Minutes,
-        [int]$AC_Minutes
-    )
-
-    # Convert minutes → seconds
-    $dcSec = $DC_Minutes * 60
-    $acSec = $AC_Minutes * 60
-
-    # Registry paths
-    $regDC = "HKLM:\SYSTEM\CurrentControlSet\Control\Power\User\PowerSchemes\$ActiveScheme\$SubGroup\$Setting"
-    $regAC = "HKLM:\SYSTEM\CurrentControlSet\Control\Power\User\PowerSchemes\$ActiveScheme\$SubGroup\$Setting"
-
-    # Force values
-    Set-ItemProperty -Path $regDC -Name "DCSettingIndex" -Value $dcSec -Type DWord -Force
-    Set-ItemProperty -Path $regAC -Name "ACSettingIndex" -Value $acSec -Type DWord -Force
-}
-
-# Helper: ask user for AC/DC values
+# Helper: ask user for AC/DC values and apply using powercfg
 function Ask-Setting {
     param(
         [string]$Prompt,
@@ -208,16 +188,22 @@ function Ask-Setting {
     $dc = [int](Read-Host "Battery (DC)")
     $ac = [int](Read-Host "Plugged in (AC)")
 
-    Set-Timeout-Forced -SubGroup $SubGroup -Setting $Setting -DC_Minutes $dc -AC_Minutes $ac
+    # Convert minutes → seconds
+    $dcSec = $dc * 60
+    $acSec = $ac * 60
+
+    # Apply using powercfg
+    powercfg /setdcvalueindex $ActiveScheme $SubGroup $Setting $dcSec
+    powercfg /setacvalueindex $ActiveScheme $SubGroup $Setting $acSec
 }
 
 # Turn off display
-Ask-Setting -Prompt "Turn off display (minutes, 0 = Never)" `
+Ask-Setting -Prompt "Turn off display timeout" `
             -SubGroup "SUB_VIDEO" `
             -Setting "VIDEOIDLE"
 
 # Sleep timeout
-Ask-Setting -Prompt "Sleep timeout (minutes, 0 = Never)" `
+Ask-Setting -Prompt "Sleep timeout" `
             -SubGroup "SUB_SLEEP" `
             -Setting "STANDBYIDLE"
 
@@ -1329,6 +1315,7 @@ Write-Host ""
 
 Start-Sleep -Seconds $rebootDelay
 shutdown /r /t 0
+
 
 
 
