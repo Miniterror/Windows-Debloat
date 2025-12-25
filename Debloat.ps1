@@ -24,6 +24,37 @@ $LogFile = Join-Path $Desktop "Full-SuperDebloat.log"
 Start-Transcript -Path $LogFile -Append
 Write-Info "Full SuperDebloat started at $(Get-Date)"
 
+# ============================================================================
+# 0.1 RESTORE POINT (Interactive)
+# ============================================================================
+
+Write-Host ""
+Write-Host "=== System Restore Point ===" -ForegroundColor Yellow
+$rpChoice = Read-Host "Do you want to create a system restore point before continuing? (Y/N)"
+
+if ($rpChoice -eq "Y") {
+
+    Write-Info "Checking if System Restore is enabled..."
+
+    # Ensure System Restore is enabled on C:
+    try {
+        Enable-ComputerRestore -Drive "C:\" -ErrorAction SilentlyContinue
+    } catch {}
+
+    Write-Info "Creating restore point (this may take a moment)..."
+
+    try {
+        Checkpoint-Computer -Description "SuperDebloat Restore Point" -RestorePointType "MODIFY_SETTINGS"
+        Write-OK "System restore point created successfully."
+    }
+    catch {
+        Write-Host "[WARN]  Failed to create restore point: $($_.Exception.Message)" -ForegroundColor Yellow
+        Write-Host "Continuing without a restore point..."
+    }
+
+} else {
+    Write-Info "Skipped creating a system restore point."
+}
 
 # 1. EU-DETECTIE (VOOR EDGE-LOGICA)
 # ============================================================================
@@ -1255,6 +1286,7 @@ Write-Host ""
 
 Start-Sleep -Seconds $rebootDelay
 shutdown /r /t 0
+
 
 
 
