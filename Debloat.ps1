@@ -201,9 +201,11 @@ Ask-Setting -Prompt "Sleep timeout (minutes, 0 = Never)" `
 # Fast Startup
 Write-Host ""
 Write-Host "=== Fast Startup ===" -ForegroundColor Yellow
-$fast = Read-Host "Disable Fast Startup? (yes/no)"
-if ($fast -eq "yes") {
-    reg add "HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Power" /v HiberbootEnabled /t REG_DWORD /d 0 /f > $null
+$fast = Read-Host "Disable Fast Startup? (Y/N)"
+
+if ($fast.Substring(0,1).ToUpper() -eq "Y") {
+    reg add "HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Power" `
+        /v HiberbootEnabled /t REG_DWORD /d 0 /f > $null
     Write-Host "Fast Startup disabled."
 } else {
     Write-Host "Fast Startup unchanged."
@@ -1286,6 +1288,7 @@ Write-Host ""
 
 Start-Sleep -Seconds $rebootDelay
 shutdown /r /t 0
+
 
 
 
