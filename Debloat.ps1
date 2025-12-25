@@ -457,13 +457,14 @@ reg add "HKCU\Software\Microsoft\GameBar" /v AllowAutoGameMode /t REG_DWORD /d 0
 # Suppress ms-gamebar protocol at user level
 reg add "HKCU\Software\Microsoft\Windows\Shell\Associations\UrlAssociations\ms-gamebar\UserChoice" /v ProgId /t REG_SZ /d "NoGameBar" /f > $null
 
-# Suppress ms-gamebar protocol at system level
-reg add "HKCR\ms-gamebar" /ve /t REG_SZ /d "NoGameBar" /f > $null
-reg add "HKCR\ms-gamebar\shell" /ve /t REG_SZ /d "" /f > $null
-reg add "HKCR\ms-gamebar\shell\open" /ve /t REG_SZ /d "" /f > $null
+# Write to the REAL hive instead of HKCR
+$base = "HKCU\Software\Classes\ms-gamebar"
 
-# Empty command handler
-reg add "HKCR\ms-gamebar\shell\open\command" /ve /t REG_SZ /d "" /f > $null
+reg add "$base" /ve /t REG_SZ /d "NoGameBar" /f > $null
+reg add "$base\shell" /ve /t REG_SZ /d "" /f > $null
+reg add "$base\shell\open" /ve /t REG_SZ /d "" /f > $null
+reg add "$base\shell\open\command" /ve /t REG_SZ /d "" /f > $null
+
 Write-OK "Controller popup suppression applied."
 
 # 8. VBS / CORE ISOLATION / SVCHOST SPLIT
@@ -1105,6 +1106,7 @@ Write-Host ""
 
 Start-Sleep -Seconds $rebootDelay
 shutdown /r /t 0
+
 
 
 
