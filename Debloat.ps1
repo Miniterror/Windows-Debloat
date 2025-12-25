@@ -171,7 +171,29 @@ Write-Host "Applying custom power plan settings..." -ForegroundColor Cyan
 # Get active power scheme
 $ActiveScheme = (powercfg /getactivescheme) -replace '.*GUID: ([a-f0-9\-]+).*','$1'
 
-# Helper function to ask for AC/DC values
+# Helper: enforce AC/DC timeout values directly in registry
+function Set-Timeout-Forced {
+    param(
+        [string]$SubGroup,
+        [string]$Setting,
+        [int]$DC_Minutes,
+        [int]$AC_Minutes
+    )
+
+    # Convert minutes → seconds
+    $dcSec = $DC_Minutes * 60
+    $acSec = $AC_Minutes * 60
+
+    # Registry paths
+    $regDC = "HKLM:\SYSTEM\CurrentControlSet\Control\Power\User\PowerSchemes\$ActiveScheme\$SubGroup\$Setting"
+    $regAC = "HKLM:\SYSTEM\CurrentControlSet\Control\Power\User\PowerSchemes\$ActiveScheme\$SubGroup\$Setting"
+
+    # Force values
+    Set-ItemProperty -Path $regDC -Name "DCSettingIndex" -Value $dcSec -Type DWord -Force
+    Set-ItemProperty -Path $regAC -Name "ACSettingIndex" -Value $acSec -Type DWord -Force
+}
+
+# Helper: ask user for AC/DC values
 function Ask-Setting {
     param(
         [string]$Prompt,
@@ -181,11 +203,12 @@ function Ask-Setting {
 
     Write-Host ""
     Write-Host "=== $Prompt ===" -ForegroundColor Yellow
-    $dc = Read-Host "Enter value for Battery (DC)"
-    $ac = Read-Host "Enter value for Plugged in (AC)"
+    Write-Host "Enter minutes (0 = Never)"
 
-    powercfg /setdcvalueindex $ActiveScheme $SubGroup $Setting $dc
-    powercfg /setacvalueindex $ActiveScheme $SubGroup $Setting $ac
+    $dc = [int](Read-Host "Battery (DC)")
+    $ac = [int](Read-Host "Plugged in (AC)")
+
+    Set-Timeout-Forced -SubGroup $SubGroup -Setting $Setting -DC_Minutes $dc -AC_Minutes $ac
 }
 
 # Turn off display
@@ -193,7 +216,7 @@ Ask-Setting -Prompt "Turn off display (minutes, 0 = Never)" `
             -SubGroup "SUB_VIDEO" `
             -Setting "VIDEOIDLE"
 
-# Sleep
+# Sleep timeout
 Ask-Setting -Prompt "Sleep timeout (minutes, 0 = Never)" `
             -SubGroup "SUB_SLEEP" `
             -Setting "STANDBYIDLE"
@@ -1288,6 +1311,7 @@ Write-Host ""
 
 Start-Sleep -Seconds $rebootDelay
 shutdown /r /t 0
+
 
 
 
