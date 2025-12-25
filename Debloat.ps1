@@ -397,8 +397,34 @@ reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" /v St
 reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" /v Start_TrackProgs /t REG_DWORD /d 0 /f > $null
 reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" /v ShowSyncProviderNotifications /t REG_DWORD /d 0 /f > $null
 
-# Taskbar alignment left
-reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" /v TaskbarAl /t REG_DWORD /d 0 /f > $null
+# TASKBAR ALIGNMENT (Interactive)
+Write-Host ""
+Write-Host "=== Taskbar Alignment ===" -ForegroundColor Yellow
+Write-Host "Choose taskbar alignment:"
+Write-Host "1 = Left"
+Write-Host "2 = Center"
+$taskbarChoice = Read-Host "Enter your choice (1-2)"
+
+switch ($taskbarChoice) {
+
+    "1" {
+        Write-Info "Setting taskbar alignment to LEFT..."
+        reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" `
+            /v TaskbarAl /t REG_DWORD /d 0 /f > $null
+    }
+
+    "2" {
+        Write-Info "Setting taskbar alignment to CENTER..."
+        reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" `
+            /v TaskbarAl /t REG_DWORD /d 1 /f > $null
+    }
+
+    default {
+        Write-Warn "Invalid choice — taskbar alignment unchanged."
+    }
+}
+
+Write-Host "You may need to restart Explorer for the change to take effect." -ForegroundColor Cyan
 
 # Taskbar pins folder leegmaken
 $taskbarPins = "$env:APPDATA\Microsoft\Internet Explorer\Quick Launch\User Pinned\TaskBar"
@@ -1229,6 +1255,7 @@ Write-Host ""
 
 Start-Sleep -Seconds $rebootDelay
 shutdown /r /t 0
+
 
 
 
