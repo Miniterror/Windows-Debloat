@@ -843,41 +843,6 @@ function Ensure-Winget {
 }
 
 # ============================================================================
-# Install a Winget package
-# ============================================================================
-function Install-WingetPackage {
-    param(
-        [Parameter(Mandatory=$true)][string]$PackageId,
-        [Parameter(Mandatory=$true)][string]$DisplayName
-    )
-
-    Write-Info "Checking if $DisplayName is installed..."
-
-    $installed = winget list --exact --id $PackageId 2>$null
-
-    if ($installed) {
-        Write-Info "$DisplayName already installed — skipping."
-        return
-    }
-
-    Write-Info "Installing $DisplayName via Winget..."
-
-    try {
-        winget install --exact --id $PackageId `
-            --silent `
-            --accept-package-agreements `
-            --accept-source-agreements `
-            --disable-interactivity `
-            --force | Out-Null
-
-        Write-OK "$DisplayName installed successfully."
-    }
-    catch {
-        Write-Err "Failed to install $DisplayName: $($_.Exception.Message)"
-    }
-}
-
-# ============================================================================
 # BROWSER INSTALLATION (Chrome / Firefox / Brave)
 # ============================================================================
 
@@ -1456,6 +1421,7 @@ Write-Host ""
 
 Start-Sleep -Seconds $rebootDelay
 shutdown /r /t 0
+
 
 
 
