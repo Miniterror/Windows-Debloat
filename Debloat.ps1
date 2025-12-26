@@ -564,6 +564,22 @@ reg add "$base\shell" /ve /t REG_SZ /d "" /f | Out-Null
 reg add "$base\shell\open" /ve /t REG_SZ /d "" /f | Out-Null
 reg add "$base\shell\open\command" /ve /t REG_SZ /d "" /f | Out-Null
 
+$basePath = "HKCU:\Software\Microsoft\Windows\Shell\Associations\UrlAssociations\ms-gamingoverlay"
+$userChoicePath = "$basePath\UserChoice"
+$progId = "AppXq0fevzme2pys62n3e0fbqa7peapykr8v"
+
+# Create the base key if missing
+if (-not (Test-Path $basePath)) {
+    New-Item -Path $basePath -Force | Out-Null
+}
+
+# Create the UserChoice key if missing
+if (-not (Test-Path $userChoicePath)) {
+    New-Item -Path $userChoicePath -Force | Out-Null
+}
+
+# Set the ProgId value
+Set-ItemProperty -Path $userChoicePath -Name "ProgId" -Value $progId -Force
 Write-OK "Controller popup suppression applied."
 
 # 8. VBS / CORE ISOLATION / SVCHOST SPLIT
@@ -1347,6 +1363,7 @@ Write-Host ""
 
 Start-Sleep -Seconds $rebootDelay
 shutdown /r /t 0
+
 
 
 
