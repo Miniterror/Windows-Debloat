@@ -825,24 +825,6 @@ function Remove-Installer {
 }
 
 # ============================================================================
-# Ensure Winget is available
-# ============================================================================
-function Ensure-Winget {
-    if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
-        Write-Err "Winget is not installed on this system. Please install Winget manually from the Microsoft Store."
-        throw "Winget missing"
-    }
-
-    # Try to update sources (prevents many common failures)
-    try {
-        winget source update --force --accept-source-agreements | Out-Null
-    }
-    catch {
-        Write-Err "Winget source update failed: $($_.Exception.Message)"
-    }
-}
-
-# ============================================================================
 # BROWSER INSTALLATION (Chrome / Firefox / Brave)
 # ============================================================================
 
@@ -1037,17 +1019,6 @@ if (-not (Test-AppInstalled "Discord")) {
     }
 } else {
     Write-Info "Discord already installed — skipping."
-}
-
-# ============================================================================
-# GOG GALAXY
-# ============================================================================
-try {
-    Ensure-Winget
-    Install-WingetPackage -PackageId "GOG.Galaxy" -DisplayName "GOG Galaxy"
-}
-catch {
-    Write-Err "GOG Galaxy installation failed: $($_.Exception.Message)"
 }
 
 # ============================================================================
@@ -1247,51 +1218,6 @@ if (-not (Test-AppInstalled "Lenovo Legion Toolkit")) {
     Write-Info "Lenovo Legion Toolkit already installed — skipping."
 }
 
-# ============================================================================
-# REVO UNINSTALLER
-# ============================================================================
-try {
-    Ensure-Winget
-    Install-WingetPackage -PackageId "RevoUninstaller.RevoUninstaller" -DisplayName "Revo Uninstaller"
-}
-catch {
-    Write-Err "Revo installation failed: $($_.Exception.Message)"
-}
-
-# ============================================================================
-# O&O SHUTUP10++
-# ============================================================================
-if (-not (Test-AppInstalled "ShutUp10")) {
-    $choice = Read-Host "O&O ShutUp10++ not found. Do you want to install it? Tweaks are already done by the script. (Y/N)"
-    if ($choice -eq "Y") {
-        Write-Info "Installing O&O ShutUp10++..."
-
-        $destPath = "C:\ShutUp10"
-        $exePath  = Join-Path $destPath "OOSU10.exe"
-        $downloadUrl = "https://dl5.oo-software.com/files/ooshutup10/OOSU10.exe"
-
-        try {
-            # Create folder if missing
-            if (-not (Test-Path $destPath)) {
-                New-Item -ItemType Directory -Path $destPath | Out-Null
-            }
-
-            # Download EXE directly into C:\
-            Invoke-WebRequest -Uri $downloadUrl -OutFile $exePath -UseBasicParsing -ErrorAction Stop
-
-            Write-OK "O&O ShutUp10++ downloaded to $destPath"
-        }
-        catch {
-            Write-Err "Failed to install O&O ShutUp10++: $($_.Exception.Message)"
-        }
-
-    } else {
-        Write-Info "Skipped installing O&O ShutUp10++."
-    }
-} else {
-    Write-Info "O&O ShutUp10++ already installed — skipping."
-}
-
 # 15. DEFAULT WALLPAPER
 # ============================================================================
 Write-Info "Setting custom wallpaper..."
@@ -1421,6 +1347,7 @@ Write-Host ""
 
 Start-Sleep -Seconds $rebootDelay
 shutdown /r /t 0
+
 
 
 
