@@ -825,6 +825,59 @@ function Remove-Installer {
 }
 
 # ============================================================================
+# Ensure Winget is available
+# ============================================================================
+function Ensure-Winget {
+    if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
+        Write-Err "Winget is not installed on this system. Please install Winget manually from the Microsoft Store."
+        throw "Winget missing"
+    }
+
+    # Try to update sources (prevents many common failures)
+    try {
+        winget source update --force --accept-source-agreements | Out-Null
+    }
+    catch {
+        Write-Err "Winget source update failed: $($_.Exception.Message)"
+    }
+}
+
+# ============================================================================
+# Install a Winget package
+# ============================================================================
+function Install-WingetPackage {
+    param(
+        [Parameter(Mandatory=$true)][string]$PackageId,
+        [Parameter(Mandatory=$true)][string]$DisplayName
+    )
+
+    Write-Info "Checking if $DisplayName is installed..."
+
+    $installed = winget list --exact --id $PackageId 2>$null
+
+    if ($installed) {
+        Write-Info "$DisplayName already installed — skipping."
+        return
+    }
+
+    Write-Info "Installing $DisplayName via Winget..."
+
+    try {
+        winget install --exact --id $PackageId `
+            --silent `
+            --accept-package-agreements `
+            --accept-source-agreements `
+            --disable-interactivity `
+            --force | Out-Null
+
+        Write-OK "$DisplayName installed successfully."
+    }
+    catch {
+        Write-Err "Failed to install $DisplayName: $($_.Exception.Message)"
+    }
+}
+
+# ============================================================================
 # BROWSER INSTALLATION (Chrome / Firefox / Brave)
 # ============================================================================
 
@@ -1022,33 +1075,14 @@ if (-not (Test-AppInstalled "Discord")) {
 }
 
 # ============================================================================
-# GOG GALAXY LAUNCHER (Direct EXE Install)
+# GOG GALAXY
 # ============================================================================
-if (-not (Test-AppInstalled "GOG Galaxy")) {
-    $choice = Read-Host "GOG Galaxy Launcher not found. Do you want to install it? (Y/N)"
-    if ($choice -eq "Y") {
-        Write-Info "Installing GOG Galaxy Launcher..."
-
-        $gogInstaller = Join-Path $env:TEMP 'GOGGalaxySetup.exe'
-        $gogUrl = "https://content-system.gog.com/open_link/download?path=/open/galaxy/client/latest/setup_galaxy.exe"
-
-        try {
-            Invoke-WebRequest -Uri $gogUrl -OutFile $gogInstaller -UseBasicParsing -ErrorAction Stop
-
-            # Silent install
-            Start-Process -FilePath $gogInstaller -ArgumentList "/VERYSILENT /NORESTART" -Wait -ErrorAction Stop
-            Write-OK "GOG Galaxy Launcher installed."
-        }
-        catch {
-            Write-Err "Failed to install GOG Galaxy Launcher: $($_.Exception.Message)"
-        }
-
-        Remove-Installer $gogInstaller
-    } else {
-        Write-Info "Skipped installing GOG Galaxy Launcher."
-    }
-} else {
-    Write-Info "GOG Galaxy Launcher already installed — skipping."
+try {
+    Ensure-Winget
+    Install-WingetPackage -PackageId "GOG.Galaxy" -DisplayName "GOG Galaxy"
+}
+catch {
+    Write-Err "GOG Galaxy installation failed: $($_.Exception.Message)"
 }
 
 # ============================================================================
@@ -1249,33 +1283,14 @@ if (-not (Test-AppInstalled "Lenovo Legion Toolkit")) {
 }
 
 # ============================================================================
-# REVO UNINSTALLER (EXE Install Only)
+# REVO UNINSTALLER
 # ============================================================================
-if (-not (Test-AppInstalled "Revo Uninstaller")) {
-    $choice = Read-Host "Revo Uninstaller not found. Do you want to install Revo Uninstaller? (Y/N)"
-    if ($choice -eq "Y") {
-        Write-Info "Installing Revo Uninstaller..."
-
-        $revoInstaller = Join-Path $env:TEMP 'revo_installer.exe'
-        $revoUrl = "https://www.revouninstaller.com/downloads/revosetup.exe"
-
-        try {
-            Invoke-WebRequest -Uri $revoUrl -OutFile $revoInstaller -UseBasicParsing -ErrorAction Stop
-
-            # Silent install
-            Start-Process -FilePath $revoInstaller -ArgumentList "/VERYSILENT /NORESTART" -Wait -ErrorAction Stop
-            Write-OK "Revo Uninstaller installed."
-        }
-        catch {
-            Write-Err "Failed to install Revo Uninstaller: $($_.Exception.Message)"
-        }
-
-        Remove-Installer $revoInstaller
-    } else {
-        Write-Info "Skipped installing Revo Uninstaller."
-    }
-} else {
-    Write-Info "Revo Uninstaller already installed — skipping."
+try {
+    Ensure-Winget
+    Install-WingetPackage -PackageId "RevoUninstaller.RevoUninstaller" -DisplayName "Revo Uninstaller"
+}
+catch {
+    Write-Err "Revo installation failed: $($_.Exception.Message)"
 }
 
 # ============================================================================
@@ -1441,6 +1456,7 @@ Write-Host ""
 
 Start-Sleep -Seconds $rebootDelay
 shutdown /r /t 0
+
 
 
 
