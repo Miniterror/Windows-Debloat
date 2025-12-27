@@ -33,7 +33,7 @@ Write-Info "Checking if system is an EU-regulated build..."
 $dmaFlag = (Get-ItemProperty -Path "HKLM:\System\Setup\MoSetup" -Name "EnableEUDMA" -ErrorAction SilentlyContinue).EnableEUDMA
 $geoId   = (Get-ItemProperty -Path "HKCU:\Control Panel\International\Geo" -Name "Nation" -ErrorAction SilentlyContinue).Nation
 
-$EU_GeoIDs = @(4,8,20,28,31,40,56,70,100,112,124,191,196,203,208,233,246,250,268,276,300,348,352,372,380,428,440,442,470,498,499,528,616,620,642,643,688,703,705,724,752,804,807)
+$EU_GeoIDs = @(4,8,20,28,31,40,56,70,100,112,124,176,191,196,203,208,233,246,250,268,276,300,348,352,372,380,428,440,442,470,498,499,528,616,620,642,643,688,703,705,724,752,804,807)
 
 $IsEU = $false
 
@@ -383,7 +383,7 @@ $item.InvokeVerb($verb)
 
 # Repinning task uitschakelen (alleen als deze bestaat)
 $taskName = "Microsoft\Windows\Shell\TaskbarLayoutModification"
-if (schtasks /Query /TN $taskName 2>$null) {
+if (cmd /c "schtasks /Query /TN $taskName" 2>$null) {
     schtasks /Change /TN $taskName /Disable 2>$null
 }
 
@@ -487,6 +487,29 @@ New-Item -Path $userChoice -Force | Out-Null
 
 Set-ItemProperty -Path $userChoice -Name "ProgId" -Value $progId -Force
 Write-Output "Controller popup suppression applied."
+
+# --- Additional Start menu cleanup (remove cached LinkedIn pin) ---
+Write-Info "Removing Start menu database to clear leftover pins..."
+
+$startMenuDB = "$env:LOCALAPPDATA\Packages\Microsoft.Windows.StartMenuExperienceHost_cw5n1h2txyewy\LocalState"
+
+if (Test-Path $startMenuDB) {
+    Get-ChildItem $startMenuDB -Filter "start*.db" -ErrorAction SilentlyContinue |
+        ForEach-Object {
+            try {
+                Remove-Item $_.FullName -Force -ErrorAction Stop
+                Write-Remove "Deleted cached Start DB: $($_.Name)"
+            } catch {
+                Write-Warn "Could not delete Start DB file $($_.Name): $($_.Exception.Message)"
+            }
+        }
+
+    Write-Info "Restarting Start menu processes..."
+    Stop-Process -Name StartMenuExperienceHost -Force -ErrorAction SilentlyContinue
+    Stop-Process -Name ShellExperienceHost -Force -ErrorAction SilentlyContinue
+} else {
+    Write-Info "Start menu DB folder not found — skipping."
+}
 
 # 8. VBS / CORE ISOLATION / SVCHOST SPLIT
 # ============================================================================
@@ -754,7 +777,7 @@ function Remove-Installer {
 $chromeInstalled = Test-AppInstalled "Google Chrome"
 
 if (-not $chromeInstalled) {
-    Write-Info "Installing Google Chrome (silent)..."
+    Write-Info "Installing Google Chrome..."
     $chromeInstaller = Join-Path $env:TEMP 'chrome_installer.exe'
 
     try {
@@ -782,7 +805,7 @@ if (-not $chromeInstalled) {
 # 7-ZIP
 # ============================================================================
 if (-not (Test-AppInstalled "7-Zip")) {
-    Write-Info "Installing 7-Zip (silent)..."
+    Write-Info "Installing 7-Zip..."
     $zipInstaller = Join-Path $env:TEMP '7zip_installer.exe'
 
     try {
@@ -802,7 +825,7 @@ if (-not (Test-AppInstalled "7-Zip")) {
 # NOTEPAD++
 # ============================================================================
 if (-not (Test-AppInstalled "Notepad++")) {
-    Write-Info "Installing Notepad++ (silent)..."
+    Write-Info "Installing Notepad++..."
 
     $npInstaller = Join-Path $env:TEMP 'npp_installer.exe'
     $apiUrl = "https://api.github.com/repos/notepad-plus-plus/notepad-plus-plus/releases/latest"
@@ -834,7 +857,7 @@ if (-not (Test-AppInstalled "Notepad++")) {
 # DISCORD
 # ============================================================================
 if (-not (Test-AppInstalled "Discord")) {
-    Write-Info "Installing Discord (silent)..."
+    Write-Info "Installing Discord..."
     $discordInstaller = Join-Path $env:TEMP 'discord_installer.exe'
     $discordUrl = "https://discord.com/api/download?platform=win"
 
@@ -847,7 +870,12 @@ if (-not (Test-AppInstalled "Discord")) {
         Write-Err "Failed to install Discord: $($_.Exception.Message)"
     }
 
-    Remove-Installer $discordInstaller
+    try {
+    Remove-Item $discordInstaller -Force
+} catch {
+    Start-Sleep -Seconds 3
+    Remove-Item $discordInstaller -Force -ErrorAction SilentlyContinue
+}
 } else {
     Write-Info "Discord already installed — skipping."
 }
@@ -856,7 +884,7 @@ if (-not (Test-AppInstalled "Discord")) {
 # STEAM
 # ============================================================================
 if (-not (Test-AppInstalled "Steam")) {
-    Write-Info "Installing Steam (silent)..."
+    Write-Info "Installing Steam..."
     $steamInstaller = Join-Path $env:TEMP 'steam_installer.exe'
     $steamUrl = "https://cdn.cloudflare.steamstatic.com/client/installer/SteamSetup.exe"
 
@@ -877,7 +905,7 @@ if (-not (Test-AppInstalled "Steam")) {
 # PUTTY
 # ============================================================================
 if (-not (Test-AppInstalled "PuTTY")) {
-    Write-Info "Installing PuTTY (silent)..."
+    Write-Info "Installing PuTTY..."
     $puttyInstaller = Join-Path $env:TEMP 'putty.msi'
     $puttyUrl = "https://the.earth.li/~sgtatham/putty/0.81/w64/putty-64bit-0.81-installer.msi"
 
@@ -898,7 +926,7 @@ if (-not (Test-AppInstalled "PuTTY")) {
 # HWiNFO64 (via Winget)
 # ============================================================================
 if (-not (Test-AppInstalled "HWiNFO64")) {
-    Write-Info "Installing HWiNFO64 via Winget (silent)..."
+    Write-Info "Installing HWiNFO64..."
     try {
         winget install --id REALiX.HWiNFO --silent --accept-package-agreements --accept-source-agreements
         Write-OK "HWiNFO64 installed."
@@ -988,7 +1016,7 @@ if (-not (Test-AppInstalled "Lenovo Legion Toolkit")) {
 
         Write-OK "Lenovo Legion Toolkit installation started (running silently in background)."
 
-        Start-Sleep -Seconds 5
+        Start-Sleep -Seconds 15
         Remove-Item $installerPath -Force
         Write-Host "Deleted installer file"
     } catch {
@@ -1109,6 +1137,25 @@ public class RestartShell {
     Write-Error "Taskbar cleanup failed: $($_.Exception.Message)"
 }
 
+Write-Info "Removing leftover system folders..."
+
+$folders = @(
+    "C:\inetpub",
+    "C:\PerfLogs",
+    "C:\Windows.old"
+)
+
+foreach ($folder in $folders) {
+    if (Test-Path $folder) {
+        try {
+            Remove-Item $folder -Recurse -Force -ErrorAction Stop
+            Write-OK "Removed $folder"
+        } catch {
+            Write-Warn "Could not remove $folder: $($_.Exception.Message)"
+        }
+    }
+}
+
 # 18. AUTOMATIC REBOOT WITH BANNER
 # ============================================================================
 
@@ -1127,6 +1174,7 @@ Write-Host ""
 
 Start-Sleep -Seconds $rebootDelay
 shutdown /r /t 0
+
 
 
 
