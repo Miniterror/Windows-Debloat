@@ -383,7 +383,8 @@ $item.InvokeVerb($verb)
 
 # Repinning task uitschakelen (alleen als deze bestaat)
 $taskName = "Microsoft\Windows\Shell\TaskbarLayoutModification"
-if (cmd /c "schtasks /Query /TN $taskName" 2>$null) {
+schtasks /Query /TN $taskName 2>$null | Out-Null
+if ($LASTEXITCODE -eq 0) {
     schtasks /Change /TN $taskName /Disable 2>$null
 }
 
@@ -509,6 +510,19 @@ if (Test-Path $startMenuDB) {
     Stop-Process -Name ShellExperienceHost -Force -ErrorAction SilentlyContinue
 } else {
     Write-Info "Start menu DB folder not found — skipping."
+}
+# --- Additional cleanup: local user LayoutModification.xml ---
+$localLayout = "$env:LOCALAPPDATA\Microsoft\Windows\Shell\LayoutModification.xml"
+if (Test-Path $localLayout) {
+    takeown /F $localLayout /A > $null
+    icacls $localLayout /grant administrators:F /T > $null
+
+    (Get-Content $localLayout) `
+        -replace 'LinkedIn','' `
+        -replace 'Microsoft.WindowsStore','' |
+        Set-Content $localLayout -Force
+
+    Write-Remove "Sanitized local user layout."
 }
 
 # 8. VBS / CORE ISOLATION / SVCHOST SPLIT
@@ -655,9 +669,11 @@ if ($IsEU) {
     Write-Info "EU build detected — removing Microsoft Edge browser..."
 
     $edgePaths = @(
-        "C:\Program Files (x86)\Microsoft\Edge\Application",
-        "C:\Program Files\Microsoft\Edge\Application"
-    )
+    "C:\Program Files (x86)\Microsoft\Edge\Application",
+    "C:\Program Files\Microsoft\Edge\Application",
+    "C:\Program Files (x86)\Microsoft\EdgeUpdate",
+    "C:\Program Files\Microsoft\EdgeUpdate"
+)
 
     foreach ($path in $edgePaths) {
         if (Test-Path $path) {
@@ -1139,10 +1155,43 @@ public class RestartShell {
 
 Write-Host "Removing leftover system folders..." -ForegroundColor Cyan
 
+# First handle Windows.old separately (requires ownership + ACL fix)
+if (Test-Path "C:\Windows.old") {
+    Write-Info "Taking ownership of Windows.old..."
+
+    try {
+        # Take ownership recursively
+        takeown /F "C:\Windows.old" /A /R /D Y > $null
+
+        # Grant Administrators full control
+        icacls "C:\Windows.old" /grant administrators:F /T > $null
+
+        Write-Info "Attempting to remove Windows.old..."
+        Remove-Item "C:\Windows.old" -Recurse -Force -ErrorAction Stop
+
+        Write-OK "Windows.old removed successfully."
+    }
+    catch {
+        Write-Warn "Windows.old could not be removed directly: $($_.Exception.Message)"
+        Write-Warn "Attempting cleanup via Disk Cleanup..."
+
+        try {
+            Start-Process cleanmgr.exe -ArgumentList "/d C:" -Wait
+            Write-OK "Disk Cleanup executed."
+        }
+        catch {
+            Write-Err "Disk Cleanup failed: $($_.Exception.Message)"
+        }
+    }
+}
+else {
+    Write-Info "Windows.old not found — skipping."
+}
+
+# Now remove the simple folders normally
 $folders = @(
     "C:\inetpub",
-    "C:\PerfLogs",
-    "C:\Windows.old"
+    "C:\PerfLogs"
 )
 
 foreach ($folder in $folders) {
@@ -1175,22 +1224,3 @@ Write-Host ""
 
 Start-Sleep -Seconds $rebootDelay
 shutdown /r /t 0
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
