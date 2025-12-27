@@ -1152,11 +1152,8 @@ foreach ($folder in $folders) {
             Write-Host "Removed $folder" -ForegroundColor Green
         }
         catch {
-            Write-Host "Could not remove $folder: $($_.Exception.Message)" -ForegroundColor Yellow
+            Write-Host "Could not remove ${folder}: $($_.Exception.Message)" -ForegroundColor Yellow
         }
-    }
-    else {
-        Write-Host "$folder does not exist" -ForegroundColor DarkGray
     }
 }
 
@@ -1178,6 +1175,7 @@ Write-Host ""
 
 Start-Sleep -Seconds $rebootDelay
 shutdown /r /t 0
+
 
 
 
