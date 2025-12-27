@@ -1137,7 +1137,7 @@ public class RestartShell {
     Write-Error "Taskbar cleanup failed: $($_.Exception.Message)"
 }
 
-Write-Info "Removing leftover system folders..."
+Write-Host "Removing leftover system folders..." -ForegroundColor Cyan
 
 $folders = @(
     "C:\inetpub",
@@ -1149,10 +1149,14 @@ foreach ($folder in $folders) {
     if (Test-Path $folder) {
         try {
             Remove-Item $folder -Recurse -Force -ErrorAction Stop
-            Write-OK "Removed $folder"
-        } catch {
-            Write-Warn "Could not remove $folder: $($_.Exception.Message)"
+            Write-Host "Removed $folder" -ForegroundColor Green
         }
+        catch {
+            Write-Host "Could not remove $folder: $($_.Exception.Message)" -ForegroundColor Yellow
+        }
+    }
+    else {
+        Write-Host "$folder does not exist" -ForegroundColor DarkGray
     }
 }
 
@@ -1174,6 +1178,7 @@ Write-Host ""
 
 Start-Sleep -Seconds $rebootDelay
 shutdown /r /t 0
+
 
 
 
