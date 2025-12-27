@@ -550,37 +550,45 @@ reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" /v St
 Write-Info "Disabling SMBv1 protocol..."
 Disable-WindowsOptionalFeature -Online -FeatureName SMB1Protocol -NoRestart -ErrorAction SilentlyContinue
 
-Write-Info "Applying controller compatibility fixes (ms-gamebar suppression)..."
+Write-Output "Applying controller compatibility fixes (ms-gamebar suppression)..."
 
-reg add "HKCU\Software\Microsoft\GameBar" /v UseControllerRemapping /t REG_DWORD /d 0 /f | Out-Null
-reg add "HKCU\Software\Microsoft\GameBar" /v AllowAutoGameMode /t REG_DWORD /d 0 /f | Out-Null
+# --- Disable Game Bar controller remapping and auto game mode ---
+$gameBarPath = "HKCU:\Software\Microsoft\GameBar"
 
-reg add "HKCU\Software\Microsoft\Windows\Shell\Associations\UrlAssociations\ms-gamebar\UserChoice" /v ProgId /t REG_SZ /d "NoGameBar" /f | Out-Null
+# Ensure the key exists
+New-Item -Path $gameBarPath -Force | Out-Null
 
-$base = "HKCU\Software\Classes\ms-gamebar"
+# Apply values
+Set-ItemProperty -Path $gameBarPath -Name "UseControllerRemapping" -Value 0 -Type DWord -Force
+Set-ItemProperty -Path $gameBarPath -Name "AllowAutoGameMode" -Value 0 -Type DWord -Force
 
-reg add "$base" /ve /t REG_SZ /d "NoGameBar" /f | Out-Null
-reg add "$base\shell" /ve /t REG_SZ /d "" /f | Out-Null
-reg add "$base\shell\open" /ve /t REG_SZ /d "" /f | Out-Null
-reg add "$base\shell\open\command" /ve /t REG_SZ /d "" /f | Out-Null
 
-$basePath = "HKCU:\Software\Microsoft\Windows\Shell\Associations\UrlAssociations\ms-gamingoverlay"
-$userChoicePath = "$basePath\UserChoice"
+# --- Override ms-gamebar protocol handler ---
+$msGameBarBase = "HKCU:\Software\Classes\ms-gamebar"
+
+New-Item -Path $msGameBarBase -Force | Out-Null
+Set-ItemProperty -Path $msGameBarBase -Name "(default)" -Value "NoGameBar" -Force
+
+New-Item -Path "$msGameBarBase\shell" -Force | Out-Null
+Set-ItemProperty -Path "$msGameBarBase\shell" -Name "(default)" -Value "" -Force
+
+New-Item -Path "$msGameBarBase\shell\open" -Force | Out-Null
+Set-ItemProperty -Path "$msGameBarBase\shell\open" -Name "(default)" -Value "" -Force
+
+New-Item -Path "$msGameBarBase\shell\open\command" -Force | Out-Null
+Set-ItemProperty -Path "$msGameBarBase\shell\open\command" -Name "(default)" -Value "" -Force
+
+
+# --- Override ms-gamingoverlay UserChoice (Game Bar popup suppression) ---
+$overlayBase = "HKCU:\Software\Microsoft\Windows\Shell\Associations\UrlAssociations\ms-gamingoverlay"
+$userChoice = "$overlayBase\UserChoice"
 $progId = "AppXq0fevzme2pys62n3e0fbqa7peapykr8v"
 
-# Create the base key if missing
-if (-not (Test-Path $basePath)) {
-    New-Item -Path $basePath -Force | Out-Null
-}
+New-Item -Path $overlayBase -Force | Out-Null
+New-Item -Path $userChoice -Force | Out-Null
 
-# Create the UserChoice key if missing
-if (-not (Test-Path $userChoicePath)) {
-    New-Item -Path $userChoicePath -Force | Out-Null
-}
-
-# Set the ProgId value
-Set-ItemProperty -Path $userChoicePath -Name "ProgId" -Value $progId -Force
-Write-OK "Controller popup suppression applied."
+Set-ItemProperty -Path $userChoice -Name "ProgId" -Value $progId -Force
+Write-Output "Controller popup suppression applied."
 
 # 8. VBS / CORE ISOLATION / SVCHOST SPLIT
 # ============================================================================
@@ -1363,6 +1371,7 @@ Write-Host ""
 
 Start-Sleep -Seconds $rebootDelay
 shutdown /r /t 0
+
 
 
 
