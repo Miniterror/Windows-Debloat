@@ -274,6 +274,9 @@ reg add "HKLM\Software\Policies\Microsoft\Accessibility\VoiceAccess" /v EnableVo
 
 # Suggested apps in Start (25H2)
 reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" /v Start_IrisRecommendations /t REG_DWORD /d 0 /f > $null
+reg add "HKLM\Software\Policies\Microsoft\Windows\SmartActionPlatform" /v DisableSmartActions /t REG_DWORD /d 1 /f > $null
+reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\SmartActionPlatform" /v Disabled /t REG_DWORD /d 1 /f > $null
+reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" /v SettingsExperienceHost_ShowRecommendations /t REG_DWORD /d 0 /f > $null
 
 # Online Service Experience Packs
 reg add "HKLM\Software\Policies\Microsoft\Windows\System" /v AllowOnlineServiceExperience /t REG_DWORD /d 0 /f > $null
@@ -281,12 +284,15 @@ reg add "HKLM\Software\Policies\Microsoft\Windows\System" /v AllowOnlineServiceE
 # Recall / AI
 reg add "HKLM\Software\Policies\Microsoft\Windows\WindowsAI" /v DisableAIDataCollection /t REG_DWORD /d 1 /f > $null
 reg add "HKLM\Software\Policies\Microsoft\Windows\WindowsAI" /v DisableAIRecall /t REG_DWORD /d 1 /f > $null
+reg add "HKLM\Software\Policies\Microsoft\Windows\WindowsAI" /v DisableAIDataCollectionUpload /t REG_DWORD /d 1 /f > $nul
 
 # Suggested Actions
 reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\SmartActionPlatform" /v Disabled /t REG_DWORD /d 1 /f > $null
 
 # App Installer suggestions (Store MSIX)
 reg add "HKLM\Software\Policies\Microsoft\Windows\Explorer" /v NoUseStoreOpenWith /t REG_DWORD /d 1 /f > $null
+reg add "HKLM\Software\Policies\Microsoft\Windows\AppInstaller" /v EnableAppInstallerAutoUpdate /t REG_DWORD /d 0 /f > $null
+reg add "HKLM\Software\Policies\Microsoft\Windows\AppInstaller" /v EnableExperimentalFeatures /t REG_DWORD /d 0 /f > $null
 
 # Web search in Start (Bing)
 reg add "HKCU\Software\Policies\Microsoft\Windows\Explorer" /v DisableSearchBoxSuggestions /t REG_DWORD /d 1 /f > $null
@@ -319,6 +325,7 @@ reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager" 
 
 # Disable Get Started / Privacy Experience
 reg add "HKLM\Software\Policies\Microsoft\Windows\OOBE" /v DisablePrivacyExperience /t REG_DWORD /d 1 /f > $null
+reg add "HKLM\Software\Policies\Microsoft\Windows\OOBE" /v DisableReinstallRecommendedApps /t REG_DWORD /d 1 /f > $null
 
 Write-OK "Extended privacy and anti-advertising hardening applied."
 # 6. WINDOWS UPDATE, DRIVERS, ONEDRIVE, DELIVERY OPTIMIZATION
@@ -388,6 +395,21 @@ if ($LASTEXITCODE -eq 0) {
     schtasks /Change /TN $taskName /Disable 2>$null
 }
 
+# Disable scheduled tasks that repin apps or modify layout
+Write-Info "Disabling layout and Shell scheduled tasks..."
+$tasks = @(
+    "\Microsoft\Windows\Shell\FamilySafetyMonitor",
+    "\Microsoft\Windows\Shell\FamilySafetyRefreshTask",
+    "\Microsoft\Windows\Shell\FamilySafetyUpload",
+    "\Microsoft\Windows\Shell\CreateObjectTask",
+    "\Microsoft\Windows\Shell\UpdateUserPictureTask",
+    "\Microsoft\Windows\Shell\StartTileData",
+    "\Microsoft\Windows\Shell\LayoutModification"
+)
+foreach ($t in $tasks) {
+    schtasks /Change /TN $t /Disable 2>$null
+}
+
 # Start menu pins via policy
 Write-Info "Clearing Start menu pins..."
 $keyStartPolicy = 'Registry::HKLM\SOFTWARE\Microsoft\PolicyManager\current\device\Start'
@@ -436,6 +458,12 @@ Write-Info "Disabling Diagnostics Tracking service..."
 Stop-Service DiagTrack -Force -ErrorAction SilentlyContinue
 Set-Service DiagTrack -StartupType Disabled
 
+# Block Microsoft Store automatic reinstallations
+Write-Info "Blocking Microsoft Store automatic reinstallations..."
+reg add "HKLM\Software\Policies\Microsoft\WindowsStore" /v AutoDownload /t REG_DWORD /d 2 /f > $null
+reg add "HKLM\Software\Policies\Microsoft\WindowsStore" /v DisableOSUpgrade /t REG_DWORD /d 1 /f > $null
+reg add "HKLM\Software\Policies\Microsoft\WindowsStore" /v DisableStoreApps /t REG_DWORD /d 1 /f > $null
+
 # Disable 'Recent files' and 'Frequent folders' in Explorer
 Write-Info "Disabling recent/frequent items in Explorer..."
 reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer" /v ShowRecent /t REG_DWORD /d 0 /f > $null
@@ -444,6 +472,11 @@ reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer" /v ShowFrequen
 # Disable 'Recently added apps' in Start menu
 Write-Info "Disabling recently added apps in Start..."
 reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" /v Start_NotifyNewApps /t REG_DWORD /d 0 /f > $null
+
+# Fully disable web search in Start menu
+Write-Info "Disabling web search in Start..."
+reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Search" /v BingSearchEnabled /t REG_DWORD /d 0 /f > $null
+reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Search" /v AllowSearchToUseLocation /t REG_DWORD /d 0 /f > $null
 
 # Disable SMBv1 (legacy, insecure protocol)
 Write-Info "Disabling SMBv1 protocol..."
@@ -1224,3 +1257,4 @@ Write-Host ""
 
 Start-Sleep -Seconds $rebootDelay
 shutdown /r /t 0
+
