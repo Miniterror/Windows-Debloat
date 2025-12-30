@@ -766,9 +766,24 @@ reg add "HKCU\Software\Classes\CLSID\{86ca1aa0-34aa-4e8b-a509-50c905bae2a2}\Inpr
 reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" /v ShowRecommendedSection /t REG_DWORD /d 0 /f > $null
 reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" /v ShowCloudFilesInHome /t REG_DWORD /d 0 /f > $null
 
-
 # 14. ONEDRIVE FULL REMOVAL
 # ============================================================================
+Write-Info "Checking for OneDrive installation..."
+
+# Detect OneDrive presence
+$OneDriveInstalled = (
+    (Get-AppxPackage -AllUsers *OneDrive* -ErrorAction SilentlyContinue) -or
+    (Test-Path "$env:SystemRoot\SysWOW64\OneDriveSetup.exe") -or
+    (Test-Path "$env:SystemRoot\System32\OneDriveSetup.exe") -or
+    (Test-Path "$env:LOCALAPPDATA\Microsoft\OneDrive") -or
+    (Test-Path "$env:PROGRAMDATA\Microsoft OneDrive") -or
+    (Test-Path "$env:USERPROFILE\OneDrive")
+)
+
+if (-not $OneDriveInstalled) {
+    Write-Info "OneDrive is not installed. Skipping removal section."
+    return
+}
 
 Write-Info "Removing OneDrive completely..."
 
@@ -1276,6 +1291,7 @@ Write-Host ""
 
 Start-Sleep -Seconds $rebootDelay
 shutdown /r /t 0
+
 
 
 
