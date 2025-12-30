@@ -396,6 +396,7 @@ if ($LASTEXITCODE -eq 0) {
 
 # Disable scheduled tasks that repin apps or modify layout
 Write-Info "Disabling layout and Shell scheduled tasks..."
+
 $tasks = @(
     "\Microsoft\Windows\Shell\FamilySafetyMonitor",
     "\Microsoft\Windows\Shell\FamilySafetyRefreshTask",
@@ -405,8 +406,14 @@ $tasks = @(
     "\Microsoft\Windows\Shell\StartTileData",
     "\Microsoft\Windows\Shell\LayoutModification"
 )
+
 foreach ($t in $tasks) {
-    schtasks /Change /TN $t /Disable 2>$null
+    # Check if the task exists
+    schtasks /Query /TN $t 2>$null | Out-Null
+    if ($LASTEXITCODE -eq 0) {
+        # Try disabling it
+        schtasks /Change /TN $t /Disable 2>$null
+    }
 }
 
 # Start menu pins via policy
@@ -429,21 +436,27 @@ $layoutFiles = @(
 
 foreach ($file in $layoutFiles) {
     if (Test-Path $file) {
-        takeown /F $file /A > $null
-        icacls $file /grant administrators:F /T > $null
 
-        $content = Get-Content $file
-        $content = $content -replace 'LinkedIn', ''
-        $content = $content -replace 'Microsoft.WindowsStore', ''
+        # Take ownership and grant rights
+        takeown /F $file /A > $null 2>&1
+        icacls $file /grant administrators:F /T > $null 2>&1
 
-        $content | Set-Content $file -Force
+        # Read XML as a single string to avoid breaking formatting
+        $content = Get-Content $file -Raw -ErrorAction SilentlyContinue
 
-        Write-Remove "Sanitized layout: $file"
+        if ($content) {
+            $content = $content -replace 'LinkedIn', ''
+            $content = $content -replace 'Microsoft.WindowsStore', ''
+
+            Set-Content -Path $file -Value $content -Force -Encoding UTF8
+
+            Write-Remove "Sanitized layout: $file"
+        }
     }
 }
 
 # Taskbar layout laten rebuilden
-reg delete "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Taskband" /f > $null
+reg delete "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Taskband" /f > $null 2>&1
 
 Write-Info "Applying additional performance, privacy and Explorer tweaks..."
 
@@ -1263,6 +1276,7 @@ Write-Host ""
 
 Start-Sleep -Seconds $rebootDelay
 shutdown /r /t 0
+
 
 
 
