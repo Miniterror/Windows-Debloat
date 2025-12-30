@@ -466,21 +466,10 @@ try {
     Write-Info "Unable to pin Explorer (COM not available), skipping..."
 }
 
-# Disable repinning task if it exists
-$taskName = "Microsoft\Windows\Shell\TaskbarLayoutModification"
-
-schtasks /Query /TN $taskName 2>$null | Out-Null
-if ($LASTEXITCODE -eq 0) {
-    Write-Info "Disabling TaskbarLayoutModification..."
-    schtasks /Change /TN $taskName /Disable 2>$null | Out-Null
-} else {
-    Write-Info "TaskbarLayoutModification not found, skipping..."
-}
-
-# Disable other Shell tasks safely
-Write-Info "Disabling layout and Shell scheduled tasks..."
-
+# List of tasks to disable
+Write-Information "Disabling Shell and layout-related scheduled tasks..."
 $tasks = @(
+    "\Microsoft\Windows\Shell\TaskbarLayoutModification",
     "\Microsoft\Windows\Shell\FamilySafetyMonitor",
     "\Microsoft\Windows\Shell\FamilySafetyRefreshTask",
     "\Microsoft\Windows\Shell\FamilySafetyUpload",
@@ -490,13 +479,34 @@ $tasks = @(
     "\Microsoft\Windows\Shell\LayoutModification"
 )
 
-foreach ($t in $tasks) {
-    schtasks /Query /TN $t 2>$null | Out-Null
-    if ($LASTEXITCODE -eq 0) {
-        Write-Info "Disabling task: $t"
-        schtasks /Change /TN $t /Disable 2>$null | Out-Null
-    } else {
-        Write-Info "Task not found: $t (skipping)"
+foreach ($task in $tasks) {
+
+    # Split path and name for PowerShell cmdlets
+    $taskPath = ($task.Substring(0, $task.LastIndexOf("\") + 1))
+    $taskName = ($task.Substring($task.LastIndexOf("\") + 1))
+
+    try {
+        # Try to retrieve the task
+        $scheduledTask = Get-ScheduledTask -TaskName $taskName -TaskPath $taskPath -ErrorAction Stop
+    }
+    catch {
+        Write-Information "Task not found: $task (skipping)"
+        continue
+    }
+
+    # Check if already disabled
+    if ($scheduledTask.State -eq "Disabled") {
+        Write-Information "Already disabled: $task"
+        continue
+    }
+
+    try {
+        Write-Information "Disabling task: $task"
+        Disable-ScheduledTask -TaskName $taskName -TaskPath $taskPath -ErrorAction Stop
+        Write-Information "Successfully disabled: $task"
+    }
+    catch {
+        Write-Information "Failed to disable $task: $($_.Exception.Message)"
     }
 }
 
@@ -1411,3 +1421,4 @@ Write-Host ""
 
 Start-Sleep -Seconds $rebootDelay
 shutdown /r /t 0
+
