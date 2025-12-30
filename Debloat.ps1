@@ -568,6 +568,16 @@ New-Item -Path $gamebarUserChoice -Force | Out-Null
 
 Set-ItemProperty -Path $gamebarUserChoice -Name "ProgId" -Value "NoGameBar" -Force
 
+Write-Output "Disabling Xbox Game Bar COM activation..."
+
+# Xbox Game Bar Overlay Host CLSID
+$clsid = "HKCU:\Software\Classes\CLSID\{D1DDC2B4-0F0A-4F6D-84D0-5C3E1C0D2E6E}"
+
+New-Item -Path $clsid -Force | Out-Null
+Set-ItemProperty -Path $clsid -Name "(default)" -Value "NoGamingOverlay" -Force
+
+New-Item -Path "$clsid\LocalServer32" -Force | Out-Null
+Set-ItemProperty -Path "$clsid\LocalServer32" -Name "(default)" -Value "" -Force
 Write-Output "Game Bar & Gaming Overlay suppression complete"
 
 # 8. VBS / CORE ISOLATION / SVCHOST SPLIT
@@ -1334,6 +1344,7 @@ Write-Host ""
 
 Start-Sleep -Seconds $rebootDelay
 shutdown /r /t 0
+
 
 
 
