@@ -1068,7 +1068,7 @@ if (-not (Test-AppInstalled "HWiNFO64")) {
         winget install --id REALiX.HWiNFO --source winget --silent --accept-package-agreements --accept-source-agreements
 
         # Verify installation
-        if (Test-AppInstalled "HWiNFO64")) {
+        if (Test-AppInstalled "HWiNFO64") {
             Write-OK "HWiNFO64 installed."
         }
         else {
@@ -1319,6 +1319,7 @@ Write-Host ""
 
 Start-Sleep -Seconds $rebootDelay
 shutdown /r /t 0
+
 
 
 
