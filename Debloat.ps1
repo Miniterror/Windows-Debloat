@@ -1062,17 +1062,26 @@ if (-not (Test-AppInstalled "PuTTY")) {
 # ============================================================================
 if (-not (Test-AppInstalled "HWiNFO64")) {
     Write-Info "Installing HWiNFO64..."
+
     try {
-        winget install --id REALiX.HWiNFO --silent --accept-package-agreements --accept-source-agreements
-        Write-OK "HWiNFO64 installed."
+        # Force Winget to use the Winget source only
+        winget install --id REALiX.HWiNFO --source winget --silent --accept-package-agreements --accept-source-agreements
+
+        # Verify installation
+        if (Test-AppInstalled "HWiNFO64")) {
+            Write-OK "HWiNFO64 installed."
+        }
+        else {
+            Write-Err "HWiNFO64 installation did not complete."
+        }
     }
     catch {
         Write-Err "Failed to install HWiNFO64: $($_.Exception.Message)"
     }
-} else {
+}
+else {
     Write-Info "HWiNFO64 already installed — skipping."
 }
-Write-OK "Application installation and configuration complete."
 
 # ============================================================================
 # ADB tools
@@ -1343,6 +1352,7 @@ Write-Host ""
 
 Start-Sleep -Seconds $rebootDelay
 shutdown /r /t 0
+
 
 
 
