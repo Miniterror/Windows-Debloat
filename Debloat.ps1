@@ -1239,122 +1239,7 @@ foreach ($folder in $folders) {
     }
 }
 
-# ============================================================================
-# 18. LINKEDIN PIN EXORCISM — REMOVE ALL SOURCES OF RE-PINNING
-# ============================================================================
-
-Write-Info "Removing all LinkedIn pin sources..."
-
-# Remove LinkedIn AppX (installed + provisioned)
-Get-AppxPackage -AllUsers *LinkedIn* | Remove-AppxPackage -AllUsers -ErrorAction SilentlyContinue
-Get-AppxProvisionedPackage -Online | Where-Object {$_.PackageName -like "*LinkedIn*"} |
-    Remove-AppxProvisionedPackage -Online -ErrorAction SilentlyContinue
-
-# Clean SYSTEM DefaultLayouts.xml
-$systemLayout = "C:\Windows\System32\DefaultLayouts.xml"
-if (Test-Path $systemLayout) {
-    takeown /F $systemLayout /A > $null
-    icacls $systemLayout /grant administrators:F /T > $null
-
-    (Get-Content $systemLayout) `
-        -replace 'LinkedIn','' `
-        -replace 'Microsoft.WindowsStore','' |
-        Set-Content $systemLayout -Force
-
-    Write-Remove "Sanitized system DefaultLayouts.xml"
-}
-
-# Clean DEFAULT USER LayoutModification.xml
-$defaultLayout = "C:\Users\Default\AppData\Local\Microsoft\Windows\Shell\LayoutModification.xml"
-if (Test-Path $defaultLayout) {
-    takeown /F $defaultLayout /A > $null
-    icacls $defaultLayout /grant administrators:F /T > $null
-
-    (Get-Content $defaultLayout) `
-        -replace 'LinkedIn','' `
-        -replace 'Microsoft.WindowsStore','' |
-        Set-Content $defaultLayout -Force
-
-    Write-Remove "Sanitized DefaultUser LayoutModification.xml"
-}
-
-# Clean LOCAL USER LayoutModification.xml
-$localLayout = "$env:LOCALAPPDATA\Microsoft\Windows\Shell\LayoutModification.xml"
-if (Test-Path $localLayout) {
-    takeown /F $localLayout /A > $null
-    icacls $localLayout /grant administrators:F /T > $null
-
-    (Get-Content $localLayout) `
-        -replace 'LinkedIn','' `
-        -replace 'Microsoft.WindowsStore','' |
-        Set-Content $localLayout -Force
-
-    Write-Remove "Sanitized local LayoutModification.xml"
-}
-
-# Clean LOCAL USER DefaultLayouts.xml (hidden source!)
-$localDefaultLayout = "$env:LOCALAPPDATA\Microsoft\Windows\Shell\DefaultLayouts.xml"
-if (Test-Path $localDefaultLayout) {
-    takeown /F $localDefaultLayout /A > $null
-    icacls $localDefaultLayout /grant administrators:F /T > $null
-
-    (Get-Content $localDefaultLayout) `
-        -replace 'LinkedIn','' `
-        -replace 'Microsoft.WindowsStore','' |
-        Set-Content $localDefaultLayout -Force
-
-    Write-Remove "Sanitized local DefaultLayouts.xml"
-}
-
-# Delete ALL Start menu DBs (start.db, start2.db, start3.db…)
-$startMenuDB = "$env:LOCALAPPDATA\Packages\Microsoft.Windows.StartMenuExperienceHost_cw5n1h2txyewy\LocalState"
-if (Test-Path $startMenuDB) {
-    Get-ChildItem $startMenuDB -Filter "start*.db" -ErrorAction SilentlyContinue |
-        ForEach-Object {
-            try {
-                Remove-Item $_.FullName -Force -ErrorAction Stop
-                Write-Remove "Deleted Start DB: $($_.Name)"
-            } catch {}
-        }
-}
-
-# Disable scheduled task that re-pins LinkedIn
-schtasks /Change /TN "\Microsoft\Windows\Shell\StartTileData" /Disable 2>$null
-
-# Disable CloudContent ID that pushes LinkedIn/Store pins
-reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager" `
-    /v SubscribedContent-338389Enabled /t REG_DWORD /d 0 /f > $null
-
-Write-OK "All LinkedIn pin sources removed."
-Write-Info "Disabling Cloud Start sync and clearing CloudStore cache..."
-
-# Disable CloudStore sync (prevents repinning)
-reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\CloudStore" /v CloudSyncEnabled /t REG_DWORD /d 0 /f > $null
-reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\CloudStore" /v CloudExperienceDisabled /t REG_DWORD /d 1 /f > $null
-
-# Delete CloudStore cache (this is where LinkedIn is hiding)
-$cloudStore = "$env:LOCALAPPDATA\Microsoft\Windows\CloudStore"
-
-if (Test-Path $cloudStore) {
-    try {
-        takeown /F $cloudStore /A /R /D Y > $null
-        icacls $cloudStore /grant administrators:F /T > $null
-
-        Remove-Item $cloudStore -Recurse -Force -ErrorAction Stop
-        Write-Remove "CloudStore cache deleted."
-    } catch {
-        Write-Warn "Could not delete CloudStore: $($_.Exception.Message)"
-    }
-} else {
-    Write-Info "CloudStore folder not found — skipping."
-}
-
-# Restart Start menu processes
-Write-Info "Restarting Start menu processes..."
-Stop-Process -Name StartMenuExperienceHost -Force -ErrorAction SilentlyContinue
-Stop-Process -Name ShellExperienceHost -Force -ErrorAction SilentlyContinue
-
-# 19. AUTOMATIC REBOOT WITH BANNER
+# 18. AUTOMATIC REBOOT WITH BANNER
 # ============================================================================
 
 $rebootDelay = 15
@@ -1372,6 +1257,7 @@ Write-Host ""
 
 Start-Sleep -Seconds $rebootDelay
 shutdown /r /t 0
+
 
 
 
