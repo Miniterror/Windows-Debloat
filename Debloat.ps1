@@ -1055,14 +1055,11 @@ if (-not (Test-AppInstalled "HWiNFO64")) {
     Write-Info "Installing HWiNFO64..."
 
     try {
-        # Force Winget to use the Winget source only
-        winget install --id REALiX.HWiNFO --source winget --silent --accept-package-agreements --accept-source-agreements
+        $result = winget install --id REALiX.HWiNFO --source winget --silent --accept-package-agreements --accept-source-agreements
 
-        # Verify installation
-        if (Test-AppInstalled "HWiNFO64") {
+        if (Test-AppInstalled "HWiNFO64")) {
             Write-OK "HWiNFO64 installed."
-        }
-        else {
+        } else {
             Write-Err "HWiNFO64 installation did not complete."
         }
     }
@@ -1071,7 +1068,20 @@ if (-not (Test-AppInstalled "HWiNFO64")) {
     }
 }
 else {
-    Write-Info "HWiNFO64 already installed — skipping."
+    Write-Info "HWiNFO64 already installed — checking for updates..."
+
+    try {
+        $upgrade = winget upgrade --id REALiX.HWiNFO --source winget --silent --accept-package-agreements --accept-source-agreements
+
+        if ($upgrade -match "No available upgrade") {
+            Write-OK "HWiNFO64 is already up to date."
+        } else {
+            Write-OK "HWiNFO64 upgraded."
+        }
+    }
+    catch {
+        Write-Err "Failed to upgrade HWiNFO64: $($_.Exception.Message)"
+    }
 }
 
 # ============================================================================
@@ -1310,6 +1320,7 @@ Write-Host ""
 
 Start-Sleep -Seconds $rebootDelay
 shutdown /r /t 0
+
 
 
 
