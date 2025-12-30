@@ -49,7 +49,6 @@ if ($dmaFlag -eq 1) {
 
 Set-Variable -Name "IsEU" -Value $IsEU -Scope Global
 
-
 # 2. APPX / PROVISIONED PACKAGE REMOVAL
 # ============================================================================
 
@@ -484,7 +483,7 @@ Disable-WindowsOptionalFeature -Online -FeatureName SMB1Protocol -NoRestart -Err
 
 Write-Output "Applying controller compatibility fixes (ms-gamebar suppression)..."
 
-# --- Disable Game Bar controller remapping and auto game mode ---
+# Disable Game Bar controller remapping and auto game mode
 $gameBarPath = "HKCU:\Software\Microsoft\GameBar"
 
 # Ensure the key exists
@@ -495,7 +494,7 @@ Set-ItemProperty -Path $gameBarPath -Name "UseControllerRemapping" -Value 0 -Typ
 Set-ItemProperty -Path $gameBarPath -Name "AllowAutoGameMode" -Value 0 -Type DWord -Force
 
 
-# --- Override ms-gamebar protocol handler ---
+# Override ms-gamebar protocol handler
 $msGameBarBase = "HKCU:\Software\Classes\ms-gamebar"
 
 New-Item -Path $msGameBarBase -Force | Out-Null
@@ -511,7 +510,7 @@ New-Item -Path "$msGameBarBase\shell\open\command" -Force | Out-Null
 Set-ItemProperty -Path "$msGameBarBase\shell\open\command" -Name "(default)" -Value "" -Force
 
 
-# --- Override ms-gamingoverlay UserChoice (Game Bar popup suppression) ---
+# Override ms-gamingoverlay UserChoice (Game Bar popup suppression)
 $overlayBase = "HKCU:\Software\Microsoft\Windows\Shell\Associations\UrlAssociations\ms-gamingoverlay"
 $userChoice = "$overlayBase\UserChoice"
 $progId = "AppXq0fevzme2pys62n3e0fbqa7peapykr8v"
@@ -521,42 +520,6 @@ New-Item -Path $userChoice -Force | Out-Null
 
 Set-ItemProperty -Path $userChoice -Name "ProgId" -Value $progId -Force
 Write-Output "Controller popup suppression applied."
-
-# --- Additional Start menu cleanup (remove cached LinkedIn pin) ---
-Write-Info "Removing Start menu database to clear leftover pins..."
-
-$startMenuDB = "$env:LOCALAPPDATA\Packages\Microsoft.Windows.StartMenuExperienceHost_cw5n1h2txyewy\LocalState"
-
-if (Test-Path $startMenuDB) {
-    Get-ChildItem $startMenuDB -Filter "start*.db" -ErrorAction SilentlyContinue |
-        ForEach-Object {
-            try {
-                Remove-Item $_.FullName -Force -ErrorAction Stop
-                Write-Remove "Deleted cached Start DB: $($_.Name)"
-            } catch {
-                Write-Warn "Could not delete Start DB file $($_.Name): $($_.Exception.Message)"
-            }
-        }
-
-    Write-Info "Restarting Start menu processes..."
-    Stop-Process -Name StartMenuExperienceHost -Force -ErrorAction SilentlyContinue
-    Stop-Process -Name ShellExperienceHost -Force -ErrorAction SilentlyContinue
-} else {
-    Write-Info "Start menu DB folder not found — skipping."
-}
-# --- Additional cleanup: local user LayoutModification.xml ---
-$localLayout = "$env:LOCALAPPDATA\Microsoft\Windows\Shell\LayoutModification.xml"
-if (Test-Path $localLayout) {
-    takeown /F $localLayout /A > $null
-    icacls $localLayout /grant administrators:F /T > $null
-
-    (Get-Content $localLayout) `
-        -replace 'LinkedIn','' `
-        -replace 'Microsoft.WindowsStore','' |
-        Set-Content $localLayout -Force
-
-    Write-Remove "Sanitized local user layout."
-}
 
 # 8. VBS / CORE ISOLATION / SVCHOST SPLIT
 # ============================================================================
@@ -687,41 +650,69 @@ if (Test-Path $defaultNtUser) {
     Write-Info "Default NTUSER.DAT not found — skipping DefaultUser tweaks."
 }
 
-
 # 12. EDGE POLICIES + EU-CONDITIONAL EDGE REMOVAL
 # ============================================================================
 
 Write-Info "Applying Edge policies..."
 
+# Disable Edge first-run and background features
 reg add "HKLM\Software\Policies\Microsoft\Edge" /v HideFirstRunExperience /t REG_DWORD /d 1 /f > $null
 reg add "HKLM\Software\Policies\Microsoft\Edge\Recommended" /v BackgroundModeEnabled /t REG_DWORD /d 0 /f > $null
 reg add "HKLM\Software\Policies\Microsoft\Edge\Recommended" /v StartupBoostEnabled /t REG_DWORD /d 0 /f > $null
-reg add "HKLM\Software\Policies\Microsoft\EdgeUpdate" /v DoNotUpdateToEdgeWithChromium /t REG_DWORD /d 1 /f > $null
+
+# Block EdgeUpdate from reinstalling Edge
+reg add "HKLM\SOFTWARE\Policies\Microsoft\EdgeUpdate" /v UpdateDefault /t REG_DWORD /d 0 /f > $null
+reg add "HKLM\SOFTWARE\Microsoft\EdgeUpdate" /v UpdateDefault /t REG_DWORD /d 0 /f > $null
 
 if ($IsEU) {
     Write-Info "EU build detected — removing Microsoft Edge browser..."
 
-    $edgePaths = @(
-    "C:\Program Files (x86)\Microsoft\Edge\Application",
-    "C:\Program Files\Microsoft\Edge\Application",
-    "C:\Program Files (x86)\Microsoft\EdgeUpdate",
-    "C:\Program Files\Microsoft\EdgeUpdate"
-)
-
-    foreach ($path in $edgePaths) {
-        if (Test-Path $path) {
-            $setup = Get-ChildItem $path -Recurse -Filter "setup.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
-            if ($setup) {
-                Write-Info "Executing Edge uninstall from: $($setup.FullName)"
-                & $setup.FullName --uninstall --system-level --force-uninstall --verbose-logging
-                Write-OK "Edge uninstall command executed."
-            }
+    # Stop and disable EdgeUpdate services
+    foreach ($svc in @("edgeupdate", "edgeupdatem")) {
+        if (Get-Service $svc -ErrorAction SilentlyContinue) {
+            Write-Info "Disabling service: $svc"
+            Stop-Service $svc -Force -ErrorAction SilentlyContinue
+            Set-Service $svc -StartupType Disabled
         }
     }
+
+    # Remove scheduled tasks that reinstall Edge
+    $tasks = @(
+        "\Microsoft\EdgeUpdate\MicrosoftEdgeUpdateTaskMachineCore",
+        "\Microsoft\EdgeUpdate\MicrosoftEdgeUpdateTaskMachineUA"
+    )
+    foreach ($task in $tasks) {
+        schtasks /Delete /TN $task /F > $null 2>&1
+    }
+
+    # Locate the correct Edge installer
+    $installer = Get-ChildItem "C:\Program Files (x86)\Microsoft\Edge\Application" -Recurse -Filter "setup.exe" -ErrorAction SilentlyContinue |
+                 Where-Object { $_.FullName -like "*\Installer\setup.exe" } |
+                 Select-Object -First 1
+
+    if ($installer) {
+        Write-Info "Executing Edge uninstall from: $($installer.FullName)"
+        & $installer.FullName --uninstall --system-level --force-uninstall --verbose-logging
+        Write-OK "Edge uninstall command executed."
+    } else {
+        Write-Warn "Edge installer not found — skipping uninstall."
+    }
+
+    # Remove EU stub launcher (only present on EU builds)
+    $stubPath = "C:\Windows\SystemApps\Microsoft.MicrosoftEdge.Stub_8wekyb3d8bbwe"
+    if (Test-Path $stubPath) {
+        Write-Info "Removing Edge stub launcher..."
+        takeown /f $stubPath /r /d y > $null
+        icacls $stubPath /grant administrators:F /t > $null
+        Remove-Item $stubPath -Recurse -Force
+        Write-OK "Edge stub removed."
+    }
+
+    Write-OK "Microsoft Edge removal completed for EU build."
+
 } else {
     Write-Info "Skipping Edge removal — not an EU-regulated build."
 }
-
 
 # 13. EXPLORER / SEARCH / CLASSIC CONTEXT MENU / WEB INTEGRATION
 # ============================================================================
@@ -1257,6 +1248,7 @@ Write-Host ""
 
 Start-Sleep -Seconds $rebootDelay
 shutdown /r /t 0
+
 
 
 
