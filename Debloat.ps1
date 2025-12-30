@@ -515,70 +515,63 @@ reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Search" /v AllowSearchTo
 Write-Info "Disabling SMBv1 protocol..."
 Disable-WindowsOptionalFeature -Online -FeatureName SMB1Protocol -NoRestart -ErrorAction SilentlyContinue
 
-# Disable Xbox popups
-Write-Output "Applying Game Bar & Gaming Overlay Suppression"
+# Disable gamebar popups
+Write-Output Disabling Xbox, Game Bar, and Overlay Activation"
 
-$gameBarPath = "HKCU:\Software\Microsoft\GameBar"
-New-Item -Path $gameBarPath -Force | Out-Null
+New-Item -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\GameBar" -Force | Out-Null
+Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\GameBar" -Name "AllowGameBar" -Value 0 -Type DWord -Force
 
-Set-ItemProperty -Path $gameBarPath -Name "UseControllerRemapping" -Value 0 -Type DWord -Force
-Set-ItemProperty -Path $gameBarPath -Name "AllowAutoGameMode" -Value 0 -Type DWord -Force
-$msGameBarProto = "HKCU:\Software\Classes\ms-gamebar"
+New-Item -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\GameDVR" -Force | Out-Null
+Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\GameDVR" -Name "AllowGameDVR" -Value 0 -Type DWord -Force
 
-New-Item -Path $msGameBarProto -Force | Out-Null
-Set-ItemProperty -Path $msGameBarProto -Name "(default)" -Value "NoGameBar" -Force
+New-Item -Path "HKCU:\Software\Microsoft\GameBar" -Force | Out-Null
+Set-ItemProperty -Path "HKCU:\Software\Microsoft\GameBar" -Name "ShowStartupPanel" -Value 0 -Type DWord -Force
+Set-ItemProperty -Path "HKCU:\Software\Microsoft\GameBar" -Name "GamePanelStartupTipIndex" -Value 3 -Type DWord -Force
 
-New-Item -Path "$msGameBarProto\shell" -Force | Out-Null
-Set-ItemProperty -Path "$msGameBarProto\shell" -Name "(default)" -Value "" -Force
+$protocols = @(
+    "HKCU:\Software\Classes\ms-gamingoverlay",
+    "HKCU:\Software\Classes\ms-gamebar",
+    "HKCU:\Software\Classes\XboxGameCallableUI"
+)
 
-New-Item -Path "$msGameBarProto\shell\open" -Force | Out-Null
-Set-ItemProperty -Path "$msGameBarProto\shell\open" -Name "(default)" -Value "" -Force
+foreach ($proto in $protocols) {
+    New-Item -Path $proto -Force | Out-Null
+    Set-ItemProperty -Path $proto -Name "(default)" -Value "NoXbox" -Force
 
-New-Item -Path "$msGameBarProto\shell\open\command" -Force | Out-Null
-Set-ItemProperty -Path "$msGameBarProto\shell\open\command" -Name "(default)" -Value "" -Force
-$msGamingOverlayProto = "HKCU:\Software\Classes\ms-gamingoverlay"
+    New-Item -Path "$proto\shell" -Force | Out-Null
+    New-Item -Path "$proto\shell\open" -Force | Out-Null
+    New-Item -Path "$proto\shell\open\command" -Force | Out-Null
+    Set-ItemProperty -Path "$proto\shell\open\command" -Name "(default)" -Value "" -Force
+}
 
-New-Item -Path $msGamingOverlayProto -Force | Out-Null
-Set-ItemProperty -Path $msGamingOverlayProto -Name "(default)" -Value "NoGamingOverlay" -Force
+$assocList = @(
+    "HKCU:\Software\Microsoft\Windows\Shell\Associations\UrlAssociations\ms-gamingoverlay",
+    "HKCU:\Software\Microsoft\Windows\Shell\Associations\UrlAssociations\ms-gamebar"
+)
 
-New-Item -Path "$msGamingOverlayProto\shell" -Force | Out-Null
-Set-ItemProperty -Path "$msGamingOverlayProto\shell" -Name "(default)" -Value "" -Force
+foreach ($assoc in $assocList) {
+    $uc = "$assoc\UserChoice"
+    New-Item -Path $assoc -Force | Out-Null
+    New-Item -Path $uc -Force | Out-Null
+    Set-ItemProperty -Path $uc -Name "ProgId" -Value "NoXbox" -Force
+}
 
-New-Item -Path "$msGamingOverlayProto\shell\open" -Force | Out-Null
-Set-ItemProperty -Path "$msGamingOverlayProto\shell\open" -Name "(default)" -Value "" -Force
+$clsids = @(
+    "{D1DDC2B4-0F0A-4F6D-84D0-5C3E1C0D2E6E}", # Game Bar Overlay Host
+    "{C1F2C2F0-3E5A-4F0E-9A3E-1C3F1A1F2A5A}", # Game Bar Alt Host
+    "{3C2F5EBA-8FBD-4E5E-9C1B-1A1F1E1C1D1F}"  # XboxGameCallableUI Host
+)
 
-New-Item -Path "$msGamingOverlayProto\shell\open\command" -Force | Out-Null
-Set-ItemProperty -Path "$msGamingOverlayProto\shell\open\command" -Name "(default)" -Value "" -Force
-Write-Output "Applying Shell Associations override for ms-gamingoverlay..."
+foreach ($id in $clsids) {
+    $path = "HKCU:\Software\Classes\CLSID\$id"
+    New-Item -Path $path -Force | Out-Null
+    Set-ItemProperty -Path $path -Name "(default)" -Value "NoXbox" -Force
 
-$overlayAssoc = "HKCU:\Software\Microsoft\Windows\Shell\Associations\UrlAssociations\ms-gamingoverlay"
-$userChoice = "$overlayAssoc\UserChoice"
+    New-Item -Path "$path\LocalServer32" -Force | Out-Null
+    Set-ItemProperty -Path "$path\LocalServer32" -Name "(default)" -Value "" -Force
+}
 
-New-Item -Path $overlayAssoc -Force | Out-Null
-New-Item -Path $userChoice -Force | Out-Null
-
-# Using a dummy ProgId to prevent Windows from asking for an app
-Set-ItemProperty -Path $userChoice -Name "ProgId" -Value "NoGamingOverlay" -Force
-
-$gamebarAssoc = "HKCU:\Software\Microsoft\Windows\Shell\Associations\UrlAssociations\ms-gamebar"
-$gamebarUserChoice = "$gamebarAssoc\UserChoice"
-
-New-Item -Path $gamebarAssoc -Force | Out-Null
-New-Item -Path $gamebarUserChoice -Force | Out-Null
-
-Set-ItemProperty -Path $gamebarUserChoice -Name "ProgId" -Value "NoGameBar" -Force
-
-Write-Output "Disabling Xbox Game Bar COM activation..."
-
-# Xbox Game Bar Overlay Host CLSID
-$clsid = "HKCU:\Software\Classes\CLSID\{D1DDC2B4-0F0A-4F6D-84D0-5C3E1C0D2E6E}"
-
-New-Item -Path $clsid -Force | Out-Null
-Set-ItemProperty -Path $clsid -Name "(default)" -Value "NoGamingOverlay" -Force
-
-New-Item -Path "$clsid\LocalServer32" -Force | Out-Null
-Set-ItemProperty -Path "$clsid\LocalServer32" -Name "(default)" -Value "" -Force
-Write-Output "Game Bar & Gaming Overlay suppression complete"
+Write-Output "Xbox/Game Bar suppression complete"
 
 # 8. VBS / CORE ISOLATION / SVCHOST SPLIT
 # ============================================================================
@@ -1344,6 +1337,7 @@ Write-Host ""
 
 Start-Sleep -Seconds $rebootDelay
 shutdown /r /t 0
+
 
 
 
