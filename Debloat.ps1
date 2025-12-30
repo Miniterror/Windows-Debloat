@@ -515,45 +515,60 @@ reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Search" /v AllowSearchTo
 Write-Info "Disabling SMBv1 protocol..."
 Disable-WindowsOptionalFeature -Online -FeatureName SMB1Protocol -NoRestart -ErrorAction SilentlyContinue
 
-Write-Output "Applying controller compatibility fixes (ms-gamebar suppression)..."
+# Disable Xbox popups
+Write-Output "Applying Game Bar & Gaming Overlay Suppression"
 
-# Disable Game Bar controller remapping and auto game mode
 $gameBarPath = "HKCU:\Software\Microsoft\GameBar"
-
-# Ensure the key exists
 New-Item -Path $gameBarPath -Force | Out-Null
 
-# Apply values
 Set-ItemProperty -Path $gameBarPath -Name "UseControllerRemapping" -Value 0 -Type DWord -Force
 Set-ItemProperty -Path $gameBarPath -Name "AllowAutoGameMode" -Value 0 -Type DWord -Force
+$msGameBarProto = "HKCU:\Software\Classes\ms-gamebar"
 
+New-Item -Path $msGameBarProto -Force | Out-Null
+Set-ItemProperty -Path $msGameBarProto -Name "(default)" -Value "NoGameBar" -Force
 
-# Override ms-gamebar protocol handler
-$msGameBarBase = "HKCU:\Software\Classes\ms-gamebar"
+New-Item -Path "$msGameBarProto\shell" -Force | Out-Null
+Set-ItemProperty -Path "$msGameBarProto\shell" -Name "(default)" -Value "" -Force
 
-New-Item -Path $msGameBarBase -Force | Out-Null
-Set-ItemProperty -Path $msGameBarBase -Name "(default)" -Value "NoGameBar" -Force
+New-Item -Path "$msGameBarProto\shell\open" -Force | Out-Null
+Set-ItemProperty -Path "$msGameBarProto\shell\open" -Name "(default)" -Value "" -Force
 
-New-Item -Path "$msGameBarBase\shell" -Force | Out-Null
-Set-ItemProperty -Path "$msGameBarBase\shell" -Name "(default)" -Value "" -Force
+New-Item -Path "$msGameBarProto\shell\open\command" -Force | Out-Null
+Set-ItemProperty -Path "$msGameBarProto\shell\open\command" -Name "(default)" -Value "" -Force
+$msGamingOverlayProto = "HKCU:\Software\Classes\ms-gamingoverlay"
 
-New-Item -Path "$msGameBarBase\shell\open" -Force | Out-Null
-Set-ItemProperty -Path "$msGameBarBase\shell\open" -Name "(default)" -Value "" -Force
+New-Item -Path $msGamingOverlayProto -Force | Out-Null
+Set-ItemProperty -Path $msGamingOverlayProto -Name "(default)" -Value "NoGamingOverlay" -Force
 
-New-Item -Path "$msGameBarBase\shell\open\command" -Force | Out-Null
-Set-ItemProperty -Path "$msGameBarBase\shell\open\command" -Name "(default)" -Value "" -Force
+New-Item -Path "$msGamingOverlayProto\shell" -Force | Out-Null
+Set-ItemProperty -Path "$msGamingOverlayProto\shell" -Name "(default)" -Value "" -Force
 
+New-Item -Path "$msGamingOverlayProto\shell\open" -Force | Out-Null
+Set-ItemProperty -Path "$msGamingOverlayProto\shell\open" -Name "(default)" -Value "" -Force
 
-# Override ms-gamingoverlay UserChoice (Game Bar popup suppression)
-$overlayBase = "HKCU:\Software\Microsoft\Windows\Shell\Associations\UrlAssociations\ms-gamingoverlay"
-$userChoice = "$overlayBase\UserChoice"
-$progId = "AppXq0fevzme2pys62n3e0fbqa7peapykr8v"
+New-Item -Path "$msGamingOverlayProto\shell\open\command" -Force | Out-Null
+Set-ItemProperty -Path "$msGamingOverlayProto\shell\open\command" -Name "(default)" -Value "" -Force
+Write-Output "Applying Shell Associations override for ms-gamingoverlay..."
 
-New-Item -Path $overlayBase -Force | Out-Null
+$overlayAssoc = "HKCU:\Software\Microsoft\Windows\Shell\Associations\UrlAssociations\ms-gamingoverlay"
+$userChoice = "$overlayAssoc\UserChoice"
+
+New-Item -Path $overlayAssoc -Force | Out-Null
 New-Item -Path $userChoice -Force | Out-Null
 
-Set-ItemProperty -Path $userChoice -Name "ProgId" -Value $progId -Force
-Write-Output "Controller popup suppression applied."
+# Using a dummy ProgId to prevent Windows from asking for an app
+Set-ItemProperty -Path $userChoice -Name "ProgId" -Value "NoGamingOverlay" -Force
+
+$gamebarAssoc = "HKCU:\Software\Microsoft\Windows\Shell\Associations\UrlAssociations\ms-gamebar"
+$gamebarUserChoice = "$gamebarAssoc\UserChoice"
+
+New-Item -Path $gamebarAssoc -Force | Out-Null
+New-Item -Path $gamebarUserChoice -Force | Out-Null
+
+Set-ItemProperty -Path $gamebarUserChoice -Name "ProgId" -Value "NoGameBar" -Force
+
+Write-Output "Game Bar & Gaming Overlay suppression complete"
 
 # 8. VBS / CORE ISOLATION / SVCHOST SPLIT
 # ============================================================================
@@ -1319,6 +1334,7 @@ Write-Host ""
 
 Start-Sleep -Seconds $rebootDelay
 shutdown /r /t 0
+
 
 
 
