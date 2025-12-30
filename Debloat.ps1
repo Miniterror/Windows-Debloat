@@ -1283,40 +1283,7 @@ public class RestartShell {
 
 Write-Host "Removing leftover system folders..." -ForegroundColor Cyan
 
-# First handle Windows.old separately (requires ownership + ACL fix)
-if (Test-Path "C:\Windows.old") {
-    Write-Info "Taking ownership of Windows.old..."
-
-    try {
-        # Take ownership recursively
-        takeown /F "C:\Windows.old" /A /R /D Y > $null
-
-        # Grant Administrators full control
-        icacls "C:\Windows.old" /grant administrators:F /T > $null
-
-        Write-Info "Attempting to remove Windows.old..."
-        Remove-Item "C:\Windows.old" -Recurse -Force -ErrorAction Stop
-
-        Write-OK "Windows.old removed successfully."
-    }
-    catch {
-        Write-Warn "Windows.old could not be removed directly: $($_.Exception.Message)"
-        Write-Warn "Attempting cleanup via Disk Cleanup..."
-
-        try {
-            Start-Process cleanmgr.exe -ArgumentList "/d C:" -Wait
-            Write-OK "Disk Cleanup executed."
-        }
-        catch {
-            Write-Err "Disk Cleanup failed: $($_.Exception.Message)"
-        }
-    }
-}
-else {
-    Write-Info "Windows.old not found — skipping."
-}
-
-# Now remove the simple folders normally
+# Remove the simple folders
 $folders = @(
     "C:\inetpub",
     "C:\PerfLogs"
@@ -1352,6 +1319,7 @@ Write-Host ""
 
 Start-Sleep -Seconds $rebootDelay
 shutdown /r /t 0
+
 
 
 
