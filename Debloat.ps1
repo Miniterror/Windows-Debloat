@@ -1326,7 +1326,33 @@ reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager" 
     /v SubscribedContent-338389Enabled /t REG_DWORD /d 0 /f > $null
 
 Write-OK "All LinkedIn pin sources removed."
+Write-Info "Disabling Cloud Start sync and clearing CloudStore cache..."
 
+# Disable CloudStore sync (prevents repinning)
+reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\CloudStore" /v CloudSyncEnabled /t REG_DWORD /d 0 /f > $null
+reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\CloudStore" /v CloudExperienceDisabled /t REG_DWORD /d 1 /f > $null
+
+# Delete CloudStore cache (this is where LinkedIn is hiding)
+$cloudStore = "$env:LOCALAPPDATA\Microsoft\Windows\CloudStore"
+
+if (Test-Path $cloudStore) {
+    try {
+        takeown /F $cloudStore /A /R /D Y > $null
+        icacls $cloudStore /grant administrators:F /T > $null
+
+        Remove-Item $cloudStore -Recurse -Force -ErrorAction Stop
+        Write-Remove "CloudStore cache deleted."
+    } catch {
+        Write-Warn "Could not delete CloudStore: $($_.Exception.Message)"
+    }
+} else {
+    Write-Info "CloudStore folder not found — skipping."
+}
+
+# Restart Start menu processes
+Write-Info "Restarting Start menu processes..."
+Stop-Process -Name StartMenuExperienceHost -Force -ErrorAction SilentlyContinue
+Stop-Process -Name ShellExperienceHost -Force -ErrorAction SilentlyContinue
 
 # 19. AUTOMATIC REBOOT WITH BANNER
 # ============================================================================
@@ -1346,5 +1372,6 @@ Write-Host ""
 
 Start-Sleep -Seconds $rebootDelay
 shutdown /r /t 0
+
 
 
