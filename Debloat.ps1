@@ -372,29 +372,49 @@ reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" /v Sh
 # Taskbar alignment left
 reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" /v TaskbarAl /t REG_DWORD /d 0 /f > $null
 
-# Taskbar pins folder leegmaken
+# Clear Taskbar pins folder
 $taskbarPins = "$env:APPDATA\Microsoft\Internet Explorer\Quick Launch\User Pinned\TaskBar"
+
 if (Test-Path $taskbarPins) {
     Write-Info "Clearing taskbar pins..."
-    Get-ChildItem $taskbarPins | Remove-Item -Force -ErrorAction SilentlyContinue
+    try {
+        Get-ChildItem $taskbarPins -ErrorAction SilentlyContinue | Remove-Item -Force -ErrorAction SilentlyContinue
+    } catch {}
+} else {
+    Write-Info "Taskbar pins folder not found, skipping..."
 }
 
-# File Explorer opnieuw pinnen
+# Re-pin File Explorer safely
 $explorerPath = "C:\Windows\explorer.exe"
 $verb = "taskbarpin"
 
-$shell = New-Object -ComObject Shell.Application
-$item = $shell.Namespace((Split-Path $explorerPath)).ParseName((Split-Path $explorerPath -Leaf))
-$item.InvokeVerb($verb)
+try {
+    $shell = New-Object -ComObject Shell.Application -ErrorAction Stop
+    $folder = $shell.Namespace((Split-Path $explorerPath))
+    $item = $folder.ParseName((Split-Path $explorerPath -Leaf))
 
-# Repinning task uitschakelen (alleen als deze bestaat)
-$taskName = "Microsoft\Windows\Shell\TaskbarLayoutModification"
-schtasks /Query /TN $taskName 2>$null | Out-Null
-if ($LASTEXITCODE -eq 0) {
-    schtasks /Change /TN $taskName /Disable 2>$null
+    if ($item.Verbs() | Where-Object { $_.Name.Replace("&","") -eq $verb }) {
+        Write-Info "Pinning File Explorer to taskbar..."
+        $item.InvokeVerb($verb)
+    } else {
+        Write-Info "Explorer already pinned or verb unavailable, skipping..."
+    }
+} catch {
+    Write-Info "Unable to pin Explorer (COM not available), skipping..."
 }
 
-# Disable scheduled tasks that repin apps or modify layout
+# Disable repinning task if it exists
+$taskName = "Microsoft\Windows\Shell\TaskbarLayoutModification"
+
+schtasks /Query /TN $taskName 2>$null | Out-Null
+if ($LASTEXITCODE -eq 0) {
+    Write-Info "Disabling TaskbarLayoutModification..."
+    schtasks /Change /TN $taskName /Disable 2>$null | Out-Null
+} else {
+    Write-Info "TaskbarLayoutModification not found, skipping..."
+}
+
+# Disable other Shell tasks safely
 Write-Info "Disabling layout and Shell scheduled tasks..."
 
 $tasks = @(
@@ -408,11 +428,12 @@ $tasks = @(
 )
 
 foreach ($t in $tasks) {
-    # Check if the task exists
     schtasks /Query /TN $t 2>$null | Out-Null
     if ($LASTEXITCODE -eq 0) {
-        # Try disabling it
-        schtasks /Change /TN $t /Disable 2>$null
+        Write-Info "Disabling task: $t"
+        schtasks /Change /TN $t /Disable 2>$null | Out-Null
+    } else {
+        Write-Info "Task not found: $t (skipping)"
     }
 }
 
@@ -1305,6 +1326,7 @@ Write-Host ""
 
 Start-Sleep -Seconds $rebootDelay
 shutdown /r /t 0
+
 
 
 
