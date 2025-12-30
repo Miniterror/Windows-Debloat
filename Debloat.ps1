@@ -515,63 +515,36 @@ reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Search" /v AllowSearchTo
 Write-Info "Disabling SMBv1 protocol..."
 Disable-WindowsOptionalFeature -Online -FeatureName SMB1Protocol -NoRestart -ErrorAction SilentlyContinue
 
-# Disable gamebar popups
-Write-Output "Disabling Xbox, Game Bar, and Overlay Activation"
+# Disable Xbox Game Bar and Game DVR
+Write-Output "Disabling Xbox Game Bar and Game DVR..."
 
 New-Item -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\GameBar" -Force | Out-Null
-Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\GameBar" -Name "AllowGameBar" -Value 0 -Type DWord -Force
+Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\GameBar" `
+    -Name "AllowGameBar" -Value 0 -Type DWord -Force
 
 New-Item -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\GameDVR" -Force | Out-Null
-Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\GameDVR" -Name "AllowGameDVR" -Value 0 -Type DWord -Force
+Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\GameDVR" `
+    -Name "AllowGameDVR" -Value 0 -Type DWord -Force
 
 New-Item -Path "HKCU:\Software\Microsoft\GameBar" -Force | Out-Null
-Set-ItemProperty -Path "HKCU:\Software\Microsoft\GameBar" -Name "ShowStartupPanel" -Value 0 -Type DWord -Force
-Set-ItemProperty -Path "HKCU:\Software\Microsoft\GameBar" -Name "GamePanelStartupTipIndex" -Value 3 -Type DWord -Force
+Set-ItemProperty -Path "HKCU:\Software\Microsoft\GameBar" `
+    -Name "ShowStartupPanel" -Value 0 -Type DWord -Force
+Set-ItemProperty -Path "HKCU:\Software\Microsoft\GameBar" `
+    -Name "GamePanelStartupTipIndex" -Value 3 -Type DWord -Force
 
-$protocols = @(
-    "HKCU:\Software\Classes\ms-gamingoverlay",
-    "HKCU:\Software\Classes\ms-gamebar",
-    "HKCU:\Software\Classes\XboxGameCallableUI"
-)
+New-Item -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\GameDVR" -Force | Out-Null
+Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\GameDVR" `
+    -Name "AppCaptureEnabled" -Value 0 -Type DWord -Force
+Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\GameDVR" `
+    -Name "GameDVR_Enabled" -Value 0 -Type DWord -Force
 
-foreach ($proto in $protocols) {
-    New-Item -Path $proto -Force | Out-Null
-    Set-ItemProperty -Path $proto -Name "(default)" -Value "NoXbox" -Force
+New-Item -Path "HKCU:\Software\Microsoft\GameBar" -Force | Out-Null
+Set-ItemProperty -Path "HKCU:\Software\Microsoft\GameBar" `
+    -Name "UseNexusForGameBarEnabled" -Value 0 -Type DWord -Force
+Set-ItemProperty -Path "HKCU:\Software\Microsoft\GameBar" `
+    -Name "AllowAutoGameMode" -Value 0 -Type DWord -Force
 
-    New-Item -Path "$proto\shell" -Force | Out-Null
-    New-Item -Path "$proto\shell\open" -Force | Out-Null
-    New-Item -Path "$proto\shell\open\command" -Force | Out-Null
-    Set-ItemProperty -Path "$proto\shell\open\command" -Name "(default)" -Value "" -Force
-}
-
-$assocList = @(
-    "HKCU:\Software\Microsoft\Windows\Shell\Associations\UrlAssociations\ms-gamingoverlay",
-    "HKCU:\Software\Microsoft\Windows\Shell\Associations\UrlAssociations\ms-gamebar"
-)
-
-foreach ($assoc in $assocList) {
-    $uc = "$assoc\UserChoice"
-    New-Item -Path $assoc -Force | Out-Null
-    New-Item -Path $uc -Force | Out-Null
-    Set-ItemProperty -Path $uc -Name "ProgId" -Value "NoXbox" -Force
-}
-
-$clsids = @(
-    "{D1DDC2B4-0F0A-4F6D-84D0-5C3E1C0D2E6E}", # Game Bar Overlay Host
-    "{C1F2C2F0-3E5A-4F0E-9A3E-1C3F1A1F2A5A}", # Game Bar Alt Host
-    "{3C2F5EBA-8FBD-4E5E-9C1B-1A1F1E1C1D1F}"  # XboxGameCallableUI Host
-)
-
-foreach ($id in $clsids) {
-    $path = "HKCU:\Software\Classes\CLSID\$id"
-    New-Item -Path $path -Force | Out-Null
-    Set-ItemProperty -Path $path -Name "(default)" -Value "NoXbox" -Force
-
-    New-Item -Path "$path\LocalServer32" -Force | Out-Null
-    Set-ItemProperty -Path "$path\LocalServer32" -Name "(default)" -Value "" -Force
-}
-
-Write-Output "Xbox/Game Bar suppression complete"
+Write-Output "Xbox Game Bar has been disabled."
 
 # 8. VBS / CORE ISOLATION / SVCHOST SPLIT
 # ============================================================================
@@ -1337,6 +1310,7 @@ Write-Host ""
 
 Start-Sleep -Seconds $rebootDelay
 shutdown /r /t 0
+
 
 
 
