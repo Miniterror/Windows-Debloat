@@ -516,7 +516,7 @@ Write-Info "Disabling SMBv1 protocol..."
 Disable-WindowsOptionalFeature -Online -FeatureName SMB1Protocol -NoRestart -ErrorAction SilentlyContinue
 
 # Disable gamebar popups
-Write-Output Disabling Xbox, Game Bar, and Overlay Activation"
+Write-Output "Disabling Xbox, Game Bar, and Overlay Activation"
 
 New-Item -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\GameBar" -Force | Out-Null
 Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\GameBar" -Name "AllowGameBar" -Value 0 -Type DWord -Force
@@ -1337,6 +1337,7 @@ Write-Host ""
 
 Start-Sleep -Seconds $rebootDelay
 shutdown /r /t 0
+
 
 
 
