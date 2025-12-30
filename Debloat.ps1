@@ -24,7 +24,6 @@ $LogFile = Join-Path $Desktop "Full-SuperDebloat.log"
 Start-Transcript -Path $LogFile -Append
 Write-Info "Full SuperDebloat started at $(Get-Date)"
 
-
 # 1. EU-DETECTIE (VOOR EDGE-LOGICA)
 # ============================================================================
 
@@ -88,7 +87,7 @@ $allAppxSelectors = @(
     "MicrosoftCorporationII.MicrosoftFamily","Microsoft.MicrosoftOfficeHub",
     "Microsoft.Office.OneNote","Microsoft.People","Microsoft.SkypeApp",
     "MicrosoftTeams","MSTeams","Microsoft.Wallet","Microsoft.YourPhone",
-    "*Clipchamp*"
+    "*Clipchamp*","*WindowsWidgets*","*WebExperience*"
 )
 
 Remove-AppPackagesSelectors -Selectors $allAppxSelectors
@@ -194,17 +193,6 @@ foreach ($key in $cdmKeys) {
     reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager" /v $key /t REG_DWORD /d 0 /f > $null
 }
 
-# App privacy access
-$privacyKeys = @(
-    "LetAppsAccessMotion","LetAppsAccessBluetooth","LetAppsAccessDocumentsLibrary",
-    "LetAppsAccessPicturesLibrary","LetAppsAccessVideosLibrary","LetAppsAccessFileSystem",
-    "LetAppsAccessUnpairedDevices","LetAppsAccessUserDictionary","LetAppsAccessPhoneCallHistory",
-    "LetAppsAccessPhoneCalls","LetAppsAccessVoiceActivation","LetAppsAccessRadios","LetAppsAccessSensors"
-)
-foreach ($key in $privacyKeys) {
-    reg add "HKLM\Software\Policies\Microsoft\Windows\AppPrivacy" /v $key /t REG_DWORD /d 2 /f > $null
-}
-
 Write-Host "[INFO] Applying O&O ShutUp10++ Recommended Tweaks..."
 # Disable Tailored Experiences
 reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Privacy" /v TailoredExperiencesWithDiagnosticDataEnabled /t REG_DWORD /d 0 /f > $null
@@ -218,20 +206,11 @@ reg add "HKLM\Software\Policies\Microsoft\Windows\System" /v UploadUserActivitie
 $AppPrivacy = "HKLM\Software\Policies\Microsoft\Windows\AppPrivacy"
 
 $permissions = @(
-    "LetAppsAccessCamera",
-    "LetAppsAccessMicrophone",
-    "LetAppsAccessContacts",
-    "LetAppsAccessCalendar",
-    "LetAppsAccessEmail",
-    "LetAppsAccessTasks",
-    "LetAppsAccessPhoneCallHistory",
-    "LetAppsAccessRadios",
-    "LetAppsAccessMotion",
-    "LetAppsAccessFileSystem",
-    "LetAppsAccessPicturesLibrary",
-    "LetAppsAccessVideosLibrary",
-    "LetAppsAccessDocumentsLibrary",
-    "LetAppsAccessUnpairedDevices"
+    "LetAppsAccessCamera","LetAppsAccessMicrophone","LetAppsAccessContacts","LetAppsAccessCalendar",
+    "LetAppsAccessEmail","LetAppsAccessTasks","LetAppsAccessPhoneCallHistory","LetAppsAccessRadios",
+    "LetAppsAccessMotion","LetAppsAccessFileSystem","LetAppsAccessPicturesLibrary","LetAppsAccessVideosLibrary",
+    "LetAppsAccessDocumentsLibrary","LetAppsAccessUnpairedDevices","LetAppsAccessBluetooth",
+	"LetAppsAccessUserDictionary","LetAppsAccessPhoneCalls","LetAppsAccessVoiceActivation","LetAppsAccessSensors"
 )
 
 foreach ($perm in $permissions) {
@@ -255,9 +234,6 @@ reg add "HKLM\Software\Policies\Microsoft\Windows\Windows Search" /v AllowCloudS
 
 # Disable Automatic App Install
 reg add "HKLM\Software\Policies\Microsoft\Windows\CloudContent" /v DisableAutomaticAppInstall /t REG_DWORD /d 1 /f > $null
-
-# Disable Suggestions in Start
-reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager" /v SystemPaneSuggestionsEnabled /t REG_DWORD /d 0 /f > $null
 
 # Disable background apps
 reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\BackgroundAccessApplications" /v GlobalUserDisabled /t REG_DWORD /d 1 /f > $null
@@ -283,10 +259,7 @@ reg add "HKLM\Software\Policies\Microsoft\Windows\System" /v AllowOnlineServiceE
 # Recall / AI
 reg add "HKLM\Software\Policies\Microsoft\Windows\WindowsAI" /v DisableAIDataCollection /t REG_DWORD /d 1 /f > $null
 reg add "HKLM\Software\Policies\Microsoft\Windows\WindowsAI" /v DisableAIRecall /t REG_DWORD /d 1 /f > $null
-reg add "HKLM\Software\Policies\Microsoft\Windows\WindowsAI" /v DisableAIDataCollectionUpload /t REG_DWORD /d 1 /f > $nul
-
-# Suggested Actions
-reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\SmartActionPlatform" /v Disabled /t REG_DWORD /d 1 /f > $null
+reg add "HKLM\Software\Policies\Microsoft\Windows\WindowsAI" /v DisableAIDataCollectionUpload /t REG_DWORD /d 1 /f > $null
 
 # App Installer suggestions (Store MSIX)
 reg add "HKLM\Software\Policies\Microsoft\Windows\Explorer" /v NoUseStoreOpenWith /t REG_DWORD /d 1 /f > $null
@@ -309,24 +282,15 @@ reg add "HKCU\Software\Policies\Microsoft\Windows\CloudContent" /v DisableWindow
 # App prelaunch (Edge, Mail, Calendar)
 reg add "HKLM\Software\Policies\Microsoft\Windows\EdgeUI" /v AllowPrelaunch /t REG_DWORD /d 0 /f > $null
 
-# Extra Clipchamp/Teams removal (fallback)
-Get-AppxPackage -AllUsers *Clipchamp* | Remove-AppxPackage -AllUsers -ErrorAction SilentlyContinue
-Get-AppxPackage -AllUsers *MSTeams*   | Remove-AppxPackage -AllUsers -ErrorAction SilentlyContinue
-
 # Windows Backup cloud prompts
 reg add "HKLM\Software\Policies\Microsoft\Windows\System" /v DisableWindowsBackup /t REG_DWORD /d 1 /f > $null
-
-# Block WhatsApp/Messenger/TikTok/Spotify recommendations
-reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager" /v SubscribedContent-353699Enabled /t REG_DWORD /d 0 /f > $null
-reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager" /v SubscribedContent-353700Enabled /t REG_DWORD /d 0 /f > $null
-reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager" /v PreInstalledAppsEnabled /t REG_DWORD /d 0 /f > $null
-reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager" /v PreInstalledAppsEverEnabled /t REG_DWORD /d 0 /f > $null
 
 # Disable Get Started / Privacy Experience
 reg add "HKLM\Software\Policies\Microsoft\Windows\OOBE" /v DisablePrivacyExperience /t REG_DWORD /d 1 /f > $null
 reg add "HKLM\Software\Policies\Microsoft\Windows\OOBE" /v DisableReinstallRecommendedApps /t REG_DWORD /d 1 /f > $null
 
 Write-OK "Extended privacy and anti-advertising hardening applied."
+
 # 6. WINDOWS UPDATE, DRIVERS, ONEDRIVE, DELIVERY OPTIMIZATION
 # ============================================================================
 
@@ -358,9 +322,6 @@ reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" /v Sh
 reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" /v TaskbarDa /t REG_DWORD /d 0 /f > $null
 reg add "HKLM\Software\Policies\Microsoft\Dsh" /v AllowNewsAndInterests /t REG_DWORD /d 0 /f > $null
 
-Get-AppxPackage -AllUsers *WindowsWidgets* | Remove-AppxPackage -AllUsers -ErrorAction SilentlyContinue
-Get-AppxPackage -AllUsers *WebExperience* | Remove-AppxPackage -AllUsers -ErrorAction SilentlyContinue
-
 # Taskbar cleanup
 reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Search" /v SearchboxTaskbarMode /t REG_DWORD /d 0 /f > $null
 reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" /v ShowTaskViewButton /t REG_DWORD /d 0 /f > $null
@@ -369,8 +330,34 @@ reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" /v St
 reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" /v Start_TrackProgs /t REG_DWORD /d 0 /f > $null
 reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" /v ShowSyncProviderNotifications /t REG_DWORD /d 0 /f > $null
 
-# Taskbar alignment left
-reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" /v TaskbarAl /t REG_DWORD /d 0 /f > $null
+# TASKBAR ALIGNMENT
+Write-Host ""
+Write-Host "=== Taskbar Alignment ===" -ForegroundColor Yellow
+Write-Host "Choose taskbar alignment:"
+Write-Host "1 = Left"
+Write-Host "2 = Center"
+$taskbarChoice = Read-Host "Enter your choice (1-2)"
+
+switch ($taskbarChoice) {
+
+    "1" {
+        Write-Info "Setting taskbar alignment to LEFT..."
+        reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" `
+            /v TaskbarAl /t REG_DWORD /d 0 /f > $null
+    }
+
+    "2" {
+        Write-Info "Setting taskbar alignment to CENTER..."
+        reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" `
+            /v TaskbarAl /t REG_DWORD /d 1 /f > $null
+    }
+
+    default {
+        Write-Warn "Invalid choice — taskbar alignment unchanged."
+    }
+}
+
+Write-Host "You may need to restart Explorer for the change to take effect."
 
 # Clear Taskbar pins folder
 $taskbarPins = "$env:APPDATA\Microsoft\Internet Explorer\Quick Launch\User Pinned\TaskBar"
@@ -403,21 +390,10 @@ try {
     Write-Info "Unable to pin Explorer (COM not available), skipping..."
 }
 
-# Disable repinning task if it exists
-$taskName = "Microsoft\Windows\Shell\TaskbarLayoutModification"
-
-schtasks /Query /TN $taskName 2>$null | Out-Null
-if ($LASTEXITCODE -eq 0) {
-    Write-Info "Disabling TaskbarLayoutModification..."
-    schtasks /Change /TN $taskName /Disable 2>$null | Out-Null
-} else {
-    Write-Info "TaskbarLayoutModification not found, skipping..."
-}
-
-# Disable other Shell tasks safely
-Write-Info "Disabling layout and Shell scheduled tasks..."
-
+# List of tasks to disable
+Write-Information "Disabling Shell and layout-related scheduled tasks..."
 $tasks = @(
+    "\Microsoft\Windows\Shell\TaskbarLayoutModification",
     "\Microsoft\Windows\Shell\FamilySafetyMonitor",
     "\Microsoft\Windows\Shell\FamilySafetyRefreshTask",
     "\Microsoft\Windows\Shell\FamilySafetyUpload",
@@ -427,13 +403,34 @@ $tasks = @(
     "\Microsoft\Windows\Shell\LayoutModification"
 )
 
-foreach ($t in $tasks) {
-    schtasks /Query /TN $t 2>$null | Out-Null
-    if ($LASTEXITCODE -eq 0) {
-        Write-Info "Disabling task: $t"
-        schtasks /Change /TN $t /Disable 2>$null | Out-Null
-    } else {
-        Write-Info "Task not found: $t (skipping)"
+foreach ($task in $tasks) {
+
+    # Split path and name for PowerShell cmdlets
+    $taskPath = ($task.Substring(0, $task.LastIndexOf("\") + 1))
+    $taskName = ($task.Substring($task.LastIndexOf("\") + 1))
+
+    try {
+        # Try to retrieve the task
+        $scheduledTask = Get-ScheduledTask -TaskName $taskName -TaskPath $taskPath -ErrorAction Stop
+    }
+    catch {
+        Write-Information "Task not found: $task (skipping)"
+        continue
+    }
+
+    # Check if already disabled
+    if ($scheduledTask.State -eq "Disabled") {
+        Write-Information "Already disabled: $task"
+        continue
+    }
+
+    try {
+        Write-Information "Disabling task: $task"
+        Disable-ScheduledTask -TaskName $taskName -TaskPath $taskPath -ErrorAction Stop
+        Write-Information "Successfully disabled: $task"
+    }
+    catch {
+        Write-Information ("Failed to disable {0}: {1}" -f $task, $_.Exception.Message)
     }
 }
 
@@ -478,6 +475,22 @@ foreach ($file in $layoutFiles) {
 
 # Taskbar layout laten rebuilden
 reg delete "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Taskband" /f > $null 2>&1
+
+# File Explorer naar This PC
+Set-ItemProperty -LiteralPath 'Registry::HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced' -Name 'LaunchTo' -Type DWord -Value 1
+
+# Edge desktop shortcuts weg
+$edgeLinkUser   = Join-Path $env:USERPROFILE "Desktop\Microsoft Edge.lnk"
+$edgeLinkPublic = "C:\Users\Public\Desktop\Microsoft Edge.lnk"
+Remove-Item -LiteralPath $edgeLinkUser   -ErrorAction SilentlyContinue
+Remove-Item -LiteralPath $edgeLinkPublic -ErrorAction SilentlyContinue
+
+# Classic context menu (Win11)
+reg add "HKCU\Software\Classes\CLSID\{86ca1aa0-34aa-4e8b-a509-50c905bae2a2}\InprocServer32" /ve /f > $null
+
+# Explorer web integratie
+reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" /v ShowRecommendedSection /t REG_DWORD /d 0 /f > $null
+reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" /v ShowCloudFilesInHome /t REG_DWORD /d 0 /f > $null
 
 Write-Info "Applying additional performance, privacy and Explorer tweaks..."
 
@@ -629,170 +642,95 @@ try {
     Write-Info "Accent color application failed — continuing..."
 }
 
-
-# 11. DEFAULT USER HIVE TWEAKS
+# 11. EDGE POLICIES + EU-CONDITIONAL EDGE REMOVAL
 # ============================================================================
+Write-Info "Edge neutralization section loaded."
 
-Write-Info "Applying DefaultUser hive tweaks..."
+# Ask end user whether to apply Edge neutralization
+$applyEdgeNeutralization = Read-Host "Do you want to disable and neutralize Microsoft Edge? (Y/N)"
 
-$defaultNtUser = "C:\Users\Default\NTUSER.DAT"
+if ($applyEdgeNeutralization -match '^[Yy]$') {
 
-if (Test-Path $defaultNtUser) {
-    reg load HKU\DefaultUser "$defaultNtUser" > $null
+    Write-Info "Starting Edge neutralization for EU build..."
 
-    # Copilot uit voor nieuwe users
-    reg add "HKU\DefaultUser\Software\Policies\Microsoft\Windows\WindowsCopilot" /v TurnOffWindowsCopilot /t REG_DWORD /d 1 /f > $null
+    if ($IsEU) {
+        reg add "HKLM\Software\Policies\Microsoft\Edge" /v HideFirstRunExperience /t REG_DWORD /d 1 /f > $null
+        reg add "HKLM\Software\Policies\Microsoft\Edge" /v DefaultBrowserSettingEnabled /t REG_DWORD /d 0 /f > $null
+        reg add "HKLM\Software\Policies\Microsoft\Edge\Recommended" /v BackgroundModeEnabled /t REG_DWORD /d 0 /f > $null
+        reg add "HKLM\Software\Policies\Microsoft\Edge\Recommended" /v StartupBoostEnabled /t REG_DWORD /d 0 /f > $null
+        reg add "HKLM\SOFTWARE\Policies\Microsoft\EdgeUpdate" /v UpdateDefault /t REG_DWORD /d 0 /f > $null
+        reg add "HKLM\SOFTWARE\Microsoft\EdgeUpdate" /v UpdateDefault /t REG_DWORD /d 0 /f > $null
 
-    # Notepad store banner
-    reg add "HKU\DefaultUser\Software\Microsoft\Notepad" /v ShowStoreBanner /t REG_DWORD /d 0 /f > $null
-
-    # GameDVR
-    reg add "HKU\DefaultUser\Software\Microsoft\Windows\CurrentVersion\GameDVR" /v AppCaptureEnabled /t REG_DWORD /d 0 /f > $null
-
-    # Explorer defaults
-    reg add "HKU\DefaultUser\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" /v HideFileExt /t REG_DWORD /d 0 /f > $null
-    reg add "HKU\DefaultUser\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" /v ShowTaskViewButton /t REG_DWORD /d 0 /f > $null
-    reg add "HKU\DefaultUser\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" /v TaskbarAl /t REG_DWORD /d 0 /f > $null
-
-    # ContentDeliveryManager defaults
-    $cdmNames = @(
-        'ContentDeliveryAllowed','FeatureManagementEnabled','OEMPreInstalledAppsEnabled',
-        'PreInstalledAppsEnabled','PreInstalledAppsEverEnabled','SilentInstalledAppsEnabled',
-        'SoftLandingEnabled','SubscribedContentEnabled','SubscribedContent-310093Enabled',
-        'SubscribedContent-338387Enabled','SubscribedContent-338388Enabled',
-        'SubscribedContent-338389Enabled','SubscribedContent-338393Enabled',
-        'SubscribedContent-353694Enabled','SubscribedContent-353696Enabled',
-        'SubscribedContent-353698Enabled','SystemPaneSuggestionsEnabled'
-    )
-    foreach ($name in $cdmNames) {
-        reg add "HKU\DefaultUser\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager" /v $name /t REG_DWORD /d 0 /f > $null
-    }
-
-    # Keyboard indicators (NumLock aan)
-    foreach ($root in 'HKU\.DEFAULT','HKU\DefaultUser') {
-        reg add "$root\Control Panel\Keyboard" /v InitialKeyboardIndicators /t REG_SZ /d 2 /f > $null
-    }
-
-    # Mouse acceleration uit
-    reg add "HKU\DefaultUser\Control Panel\Mouse" /v MouseSpeed      /t REG_SZ /d 0 /f > $null
-    reg add "HKU\DefaultUser\Control Panel\Mouse" /v MouseThreshold1 /t REG_SZ /d 0 /f > $null
-    reg add "HKU\DefaultUser\Control Panel\Mouse" /v MouseThreshold2 /t REG_SZ /d 0 /f > $null
-
-    # Search suggestions uit
-    reg add "HKU\DefaultUser\Software\Policies\Microsoft\Windows\Explorer" /v DisableSearchBoxSuggestions /t REG_DWORD /d 1 /f > $null
-
-    # Accentkleur op titelbalken uit
-    reg add "HKU\DefaultUser\Software\Microsoft\Windows\DWM" /v ColorPrevalence /t REG_DWORD /d 0 /f > $null
-
-    reg unload HKU\DefaultUser > $null
-} else {
-    Write-Info "Default NTUSER.DAT not found — skipping DefaultUser tweaks."
-}
-
-# 12. EDGE POLICIES + EU-CONDITIONAL EDGE REMOVAL
-# ============================================================================
-
-Write-Info "Starting Edge neutralization for EU build..."
-
-if ($IsEU) {
-    reg add "HKLM\Software\Policies\Microsoft\Edge" /v HideFirstRunExperience /t REG_DWORD /d 1 /f > $null
-    reg add "HKLM\Software\Policies\Microsoft\Edge" /v DefaultBrowserSettingEnabled /t REG_DWORD /d 0 /f > $null
-    reg add "HKLM\Software\Policies\Microsoft\Edge\Recommended" /v BackgroundModeEnabled /t REG_DWORD /d 0 /f > $null
-    reg add "HKLM\Software\Policies\Microsoft\Edge\Recommended" /v StartupBoostEnabled /t REG_DWORD /d 0 /f > $null
-    reg add "HKLM\SOFTWARE\Policies\Microsoft\EdgeUpdate" /v UpdateDefault /t REG_DWORD /d 0 /f > $null
-    reg add "HKLM\SOFTWARE\Microsoft\EdgeUpdate" /v UpdateDefault /t REG_DWORD /d 0 /f > $null
-
-    foreach ($svc in @("edgeupdate", "edgeupdatem")) {
-        $service = Get-Service $svc -ErrorAction SilentlyContinue
-        if ($service) {
-            Stop-Service $svc -Force -ErrorAction SilentlyContinue
-            Set-Service $svc -StartupType Disabled
+        foreach ($svc in @("edgeupdate", "edgeupdatem")) {
+            $service = Get-Service $svc -ErrorAction SilentlyContinue
+            if ($service) {
+                Stop-Service $svc -Force -ErrorAction SilentlyContinue
+                Set-Service $svc -StartupType Disabled
+            }
         }
-    }
 
-    schtasks /Delete /TN "\Microsoft\EdgeUpdate\MicrosoftEdgeUpdateTaskMachineCore" /F > $null 2>&1
-    schtasks /Delete /TN "\Microsoft\EdgeUpdate\MicrosoftEdgeUpdateTaskMachineUA" /F > $null 2>&1
+        schtasks /Delete /TN "\Microsoft\EdgeUpdate\MicrosoftEdgeUpdateTaskMachineCore" /F > $null 2>&1
+        schtasks /Delete /TN "\Microsoft\EdgeUpdate\MicrosoftEdgeUpdateTaskMachineUA" /F > $null 2>&1
 
-    $edgeShortcuts = @(
-        "$env:PUBLIC\Desktop\Microsoft Edge.lnk",
-        "$env:APPDATA\Microsoft\Internet Explorer\Quick Launch\User Pinned\TaskBar\Microsoft Edge.lnk",
-        "$env:PROGRAMDATA\Microsoft\Windows\Start Menu\Programs\Microsoft Edge.lnk"
-    )
+        $edgeShortcuts = @(
+            "$env:PUBLIC\Desktop\Microsoft Edge.lnk",
+            "$env:APPDATA\Microsoft\Internet Explorer\Quick Launch\User Pinned\TaskBar\Microsoft Edge.lnk",
+            "$env:PROGRAMDATA\Microsoft\Windows\Start Menu\Programs\Microsoft Edge.lnk"
+        )
 
-    foreach ($shortcut in $edgeShortcuts) {
-        if (Test-Path $shortcut) {
-            Remove-Item $shortcut -Force -ErrorAction SilentlyContinue
+        foreach ($shortcut in $edgeShortcuts) {
+            if (Test-Path $shortcut) {
+                Remove-Item $shortcut -Force -ErrorAction SilentlyContinue
+            }
         }
-    }
 
-    # Remove taskbar pin via registry
-    $taskbarReg = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Taskband"
-    if (Test-Path $taskbarReg) {
-        Remove-ItemProperty -Path $taskbarReg -Name "Favorites" -ErrorAction SilentlyContinue
-        Remove-ItemProperty -Path $taskbarReg -Name "FavoritesResolve" -ErrorAction SilentlyContinue
-    }
-
-    $srpPath = "HKLM:\SOFTWARE\Policies\Microsoft\Windows\Safer\CodeIdentifiers"
-    reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows\Safer\CodeIdentifiers" /v DefaultLevel /t REG_DWORD /d 0x40000 /f > $null
-
-    $pathsToBlock = @(
-        "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
-        "C:\Program Files\Microsoft\Edge\Application\msedge.exe"
-    )
-
-    $ruleId = 10000
-    foreach ($path in $pathsToBlock) {
-        if (Test-Path $path) {
-            $ruleKey = "$srpPath\0\Paths\$ruleId"
-            New-Item -Path $ruleKey -Force | Out-Null
-            New-ItemProperty -Path $ruleKey -Name "ItemData" -Value $path -PropertyType String -Force | Out-Null
-            New-ItemProperty -Path $ruleKey -Name "SaferFlags" -Value 0 -PropertyType DWord -Force | Out-Null
-            $ruleId++
+        # Remove taskbar pin via registry
+        $taskbarReg = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Taskband"
+        if (Test-Path $taskbarReg) {
+            Remove-ItemProperty -Path $taskbarReg -Name "Favorites" -ErrorAction SilentlyContinue
+            Remove-ItemProperty -Path $taskbarReg -Name "FavoritesResolve" -ErrorAction SilentlyContinue
         }
+
+        $srpPath = "HKLM:\SOFTWARE\Policies\Microsoft\Windows\Safer\CodeIdentifiers"
+        reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows\Safer\CodeIdentifiers" /v DefaultLevel /t REG_DWORD /d 0x40000 /f > $null
+
+        $pathsToBlock = @(
+            "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
+            "C:\Program Files\Microsoft\Edge\Application\msedge.exe"
+        )
+
+        $ruleId = 10000
+        foreach ($path in $pathsToBlock) {
+            if (Test-Path $path) {
+                $ruleKey = "$srpPath\0\Paths\$ruleId"
+                New-Item -Path $ruleKey -Force | Out-Null
+                New-ItemProperty -Path $ruleKey -Name "ItemData" -Value $path -PropertyType String -Force | Out-Null
+                New-ItemProperty -Path $ruleKey -Name "SaferFlags" -Value 0 -PropertyType DWord -Force | Out-Null
+                $ruleId++
+            }
+        }
+
+        # This assumes Chrome; replace with your browser if needed.
+        $assoc = @(
+            "http", "https", "html", "htm", "pdf"
+        )
+
+        foreach ($ext in $assoc) {
+            reg add "HKCU\Software\Microsoft\Windows\Shell\Associations\UrlAssociations\$ext\UserChoice" `
+                /v ProgId /t REG_SZ /d "ChromeHTML" /f > $null
+        }
+
+        Write-OK "Edge neutralization completed. Edge is now hidden, blocked, and non-functional."
+
+    } else {
+        Write-Info "Non-EU build detected — skipping Edge neutralization."
     }
-
-    # This assumes Chrome; replace with your browser if needed.
-    $assoc = @(
-        "http", "https", "html", "htm", "pdf"
-    )
-
-    foreach ($ext in $assoc) {
-        reg add "HKCU\Software\Microsoft\Windows\Shell\Associations\UrlAssociations\$ext\UserChoice" `
-            /v ProgId /t REG_SZ /d "ChromeHTML" /f > $null
-    }
-
-    Write-OK "Edge neutralization completed. Edge is now hidden, blocked, and non-functional."
 
 } else {
-    Write-Info "Non-EU build detected — skipping Edge neutralization."
+    Write-Info "User chose not to neutralize Edge — skipping."
 }
 
-
-# 13. EXPLORER / SEARCH / CLASSIC CONTEXT MENU / WEB INTEGRATION
-# ============================================================================
-
-Write-Info "Applying Explorer tweaks..."
-
-# File Explorer naar This PC
-Set-ItemProperty -LiteralPath 'Registry::HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced' -Name 'LaunchTo' -Type DWord -Value 1
-
-# Taskbar search box verbergen
-Set-ItemProperty -LiteralPath 'Registry::HKCU\Software\Microsoft\Windows\CurrentVersion\Search' -Name 'SearchboxTaskbarMode' -Type DWord -Value 0
-
-# Edge desktop shortcuts weg
-$edgeLinkUser   = Join-Path $env:USERPROFILE "Desktop\Microsoft Edge.lnk"
-$edgeLinkPublic = "C:\Users\Public\Desktop\Microsoft Edge.lnk"
-Remove-Item -LiteralPath $edgeLinkUser   -ErrorAction SilentlyContinue
-Remove-Item -LiteralPath $edgeLinkPublic -ErrorAction SilentlyContinue
-
-# Classic context menu (Win11)
-reg add "HKCU\Software\Classes\CLSID\{86ca1aa0-34aa-4e8b-a509-50c905bae2a2}\InprocServer32" /ve /f > $null
-
-# Explorer web integratie
-reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" /v ShowRecommendedSection /t REG_DWORD /d 0 /f > $null
-reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" /v ShowCloudFilesInHome /t REG_DWORD /d 0 /f > $null
-
-# 14. ONEDRIVE FULL REMOVAL
+# 12. ONEDRIVE FULL REMOVAL
 # ============================================================================
 Write-Info "Checking for OneDrive installation..."
 
@@ -833,9 +771,8 @@ reg delete "HKCU\Software\Microsoft\Windows\CurrentVersion\Run" /v OneDrive /f 2
 # (optioneel) OneDrive uit de Explorer navigatieboom
 reg add "HKCR\CLSID\{018D5C66-4533-4307-9B53-224DE2ED1FE6}" /v System.IsPinnedToNameSpaceTree /t REG_DWORD /d 0 /f 2>$null
 
-# ============================================================================
-# 15. APPLICATION INSTALLATION (Chrome, 7-Zip, Notepad++, PuTTY, HWiNFO64, MSI Afterburner)
-# ============================================================================
+# 13. APPLICATION INSTALLATION (Optimized)
+# =====================================================================
 
 function Write-Info { param($m) Write-Host "[INFO]  $m" -ForegroundColor Cyan }
 function Write-OK   { param($m) Write-Host "[OK]    $m" -ForegroundColor Green }
@@ -844,7 +781,9 @@ function Write-Err  { param($m) Write-Host "[ERROR] $m" -ForegroundColor Red }
 
 Write-Info "Checking required applications..."
 
+# =====================================================================
 # Helper: Check if an app exists in uninstall registry
+# =====================================================================
 function Test-AppInstalled {
     param([string]$Name)
 
@@ -856,83 +795,65 @@ function Test-AppInstalled {
 
     foreach ($path in $paths) {
         try {
-            Get-ItemProperty -Path $path -ErrorAction SilentlyContinue |
-                ForEach-Object {
-                    if ($_.DisplayName -and ($_.DisplayName -like "*$Name*")) {
-                        return $true
-                    }
+            $items = Get-ItemProperty -Path $path -ErrorAction SilentlyContinue
+            foreach ($item in $items) {
+                if ($item.DisplayName -and $item.DisplayName -like "*$Name*") {
+                    return $true
                 }
+            }
         } catch {}
     }
     return $false
 }
 
-# Helper: Delete installer file safely
-function Remove-Installer {
-    param([string]$file)
-    if (Test-Path $file) {
-        try {
-            Remove-Item $file -Force -ErrorAction Stop
-            Write-Info "Deleted installer: $file"
-        } catch {
-            Write-Warn "Could not delete installer: $file"
-        }
+# =====================================================================
+# Helper: Download + Install EXE/MSI
+# =====================================================================
+function Install-FromUrl {
+    param(
+        [string]$Name,
+        [string]$Url,
+        [string]$Arguments = "/S"
+    )
+
+    if (Test-AppInstalled $Name) {
+        Write-Info "$Name already installed — skipping."
+        return
     }
+
+    Write-Info "Installing $Name..."
+
+    $installer = Join-Path $env:TEMP "$($Name.Replace(' ','_')).exe"
+
+    try {
+        Invoke-WebRequest -Uri $Url -OutFile $installer -UseBasicParsing -ErrorAction Stop
+        Start-Process -FilePath $installer -ArgumentList $Arguments -Wait -ErrorAction Stop
+        Write-OK "$Name installed."
+    }
+    catch {
+        Write-Err "Failed to install $Name: $($_.Exception.Message)"
+    }
+
+    if (Test-Path $installer) { Remove-Item $installer -Force -ErrorAction SilentlyContinue }
 }
 
-# ============================================================================
+# =====================================================================
 # GOOGLE CHROME
-# ============================================================================
-$chromeInstalled = Test-AppInstalled "Google Chrome"
+# =====================================================================
+Install-FromUrl -Name "Google Chrome" `
+    -Url "https://dl.google.com/chrome/install/latest/chrome_installer.exe" `
+    -Arguments "/silent /install"
 
-if (-not $chromeInstalled) {
-    Write-Info "Installing Google Chrome..."
-    $chromeInstaller = Join-Path $env:TEMP 'chrome_installer.exe'
-
-    try {
-        Invoke-WebRequest -Uri "https://dl.google.com/chrome/install/latest/chrome_installer.exe" -OutFile $chromeInstaller -UseBasicParsing -ErrorAction Stop
-        Start-Process -FilePath $chromeInstaller -ArgumentList "/silent","/install" -Wait -ErrorAction Stop
-        Write-OK "Google Chrome installed."
-
-        # Set Chrome as default
-        $chromeExe = Join-Path $env:ProgramFiles 'Google\Chrome\Application\chrome.exe'
-        if (Test-Path $chromeExe) {
-            Start-Process -FilePath $chromeExe -ArgumentList '--make-default-browser'
-            Write-OK "Chrome set as default browser."
-        }
-
-    } catch {
-        Write-Err "Failed to install Google Chrome: $($_.Exception.Message)"
-    }
-
-    Remove-Installer $chromeInstaller
-} else {
-    Write-Info "Google Chrome already installed — skipping."
-}
-
-# ============================================================================
+# =====================================================================
 # 7-ZIP
-# ============================================================================
-if (-not (Test-AppInstalled "7-Zip")) {
-    Write-Info "Installing 7-Zip..."
-    $zipInstaller = Join-Path $env:TEMP '7zip_installer.exe'
+# =====================================================================
+Install-FromUrl -Name "7-Zip" `
+    -Url "https://www.7-zip.org/a/7z2408-x64.exe" `
+    -Arguments "/S"
 
-    try {
-        Invoke-WebRequest -Uri "https://www.7-zip.org/a/7z2408-x64.exe" -OutFile $zipInstaller -UseBasicParsing -ErrorAction Stop
-        Start-Process -FilePath $zipInstaller -ArgumentList "/S" -Wait -ErrorAction Stop
-        Write-OK "7-Zip installed."
-    } catch {
-        Write-Err "Failed to install 7-Zip: $($_.Exception.Message)"
-    }
-
-    Remove-Installer $zipInstaller
-} else {
-    Write-Info "7-Zip already installed — skipping."
-}
-
-# ============================================================================
+# =====================================================================
 # NOTEPAD++
-# ============================================================================
+# =====================================================================
 if (-not (Test-AppInstalled "Notepad++")) {
     Write-Info "Installing Notepad++..."
 
@@ -947,91 +868,41 @@ if (-not (Test-AppInstalled "Notepad++")) {
             Where-Object { $_.name -match "Installer.*x64.*\.exe$" } |
             Select-Object -First 1
 
-        $nppUrl = $asset.browser_download_url
-        Start-BitsTransfer -Source $nppUrl -Destination $npInstaller -ErrorAction Stop
-
+        Start-BitsTransfer -Source $asset.browser_download_url -Destination $npInstaller -ErrorAction Stop
         Start-Process -FilePath $npInstaller -ArgumentList "/S" -Wait -ErrorAction Stop
+
         Write-OK "Notepad++ installed."
     }
     catch {
         Write-Err "Failed to install Notepad++: $($_.Exception.Message)"
     }
 
-    Remove-Installer $npInstaller
-} else {
+    if (Test-Path $npInstaller) { Remove-Item $npInstaller -Force }
+}
+else {
     Write-Info "Notepad++ already installed — skipping."
 }
 
-# ============================================================================
+# =====================================================================
 # DISCORD
-# ============================================================================
-if (-not (Test-AppInstalled "Discord")) {
-    Write-Info "Installing Discord..."
-    $discordInstaller = Join-Path $env:TEMP 'discord_installer.exe'
-    $discordUrl = "https://discord.com/api/download?platform=win"
+# =====================================================================
+Install-FromUrl -Name "Discord" `
+    -Url "https://discord.com/api/download?platform=win" `
+    -Arguments "/S"
 
-    try {
-        Invoke-WebRequest -Uri $discordUrl -OutFile $discordInstaller -ErrorAction Stop
-        Start-Process -FilePath $discordInstaller -ArgumentList "/S" -Wait -ErrorAction Stop
-        Write-OK "Discord installed."
-    }
-    catch {
-        Write-Err "Failed to install Discord: $($_.Exception.Message)"
-    }
-
-    # --- Safe cleanup of installer ---
-    if (Test-Path $discordInstaller) {
-        try {
-            # Try normal delete first
-            Remove-Item $discordInstaller -Force -ErrorAction Stop
-        }
-        catch {
-            # If locked, wait and try again silently
-            Start-Sleep -Seconds 3
-
-            try {
-                # Kill any running installer process
-                Get-Process "discord_installer" -ErrorAction SilentlyContinue |
-                    Stop-Process -Force -ErrorAction SilentlyContinue
-
-                Remove-Item $discordInstaller -Force -ErrorAction SilentlyContinue
-            }
-            catch {
-                # Final fallback: log and skip
-                Write-Info "Discord installer could not be removed (file in use). Skipping cleanup."
-            }
-        }
-    }
-} else {
-    Write-Info "Discord already installed — skipping."
-}
-
-# ============================================================================
+# =====================================================================
 # STEAM
-# ============================================================================
-if (-not (Test-AppInstalled "Steam")) {
-    Write-Info "Installing Steam..."
-    $steamInstaller = Join-Path $env:TEMP 'steam_installer.exe'
-    $steamUrl = "https://cdn.cloudflare.steamstatic.com/client/installer/SteamSetup.exe"
+# =====================================================================
+Install-FromUrl -Name "Steam" `
+    -Url "https://cdn.cloudflare.steamstatic.com/client/installer/SteamSetup.exe" `
+    -Arguments "/S"
 
-    try {
-        Invoke-WebRequest -Uri $steamUrl -OutFile $steamInstaller -UseBasicParsing -ErrorAction Stop
-        Start-Process -FilePath $steamInstaller -ArgumentList "/S" -Wait -ErrorAction Stop
-        Write-OK "Steam installed."
-    } catch {
-        Write-Err "Failed to install Steam: $($_.Exception.Message)"
-    }
-
-    Remove-Installer $steamInstaller
-} else {
-    Write-Info "Steam already installed — skipping."
-}
-
-# ============================================================================
+# =====================================================================
 # PUTTY
-# ============================================================================
+# =====================================================================
 if (-not (Test-AppInstalled "PuTTY")) {
     Write-Info "Installing PuTTY..."
+
     $puttyInstaller = Join-Path $env:TEMP 'putty.msi'
     $puttyUrl = "https://the.earth.li/~sgtatham/putty/0.81/w64/putty-64bit-0.81-installer.msi"
 
@@ -1039,29 +910,25 @@ if (-not (Test-AppInstalled "PuTTY")) {
         Invoke-WebRequest -Uri $puttyUrl -OutFile $puttyInstaller -ErrorAction Stop
         Start-Process "msiexec.exe" -ArgumentList "/i `"$puttyInstaller`" /qn" -Wait
         Write-OK "PuTTY installed."
-    } catch {
+    }
+    catch {
         Write-Err "Failed to install PuTTY: $($_.Exception.Message)"
     }
 
-    Remove-Installer $puttyInstaller
-} else {
+    if (Test-Path $puttyInstaller) { Remove-Item $puttyInstaller -Force }
+}
+else {
     Write-Info "PuTTY already installed — skipping."
 }
 
-# ============================================================================
-# HWiNFO64 (via Winget)
-# ============================================================================
+# =====================================================================
+# HWiNFO64 (Winget)
+# =====================================================================
 if (-not (Test-AppInstalled "HWiNFO64")) {
     Write-Info "Installing HWiNFO64..."
-
     try {
-        $result = winget install --id REALiX.HWiNFO --source winget --silent --accept-package-agreements --accept-source-agreements
-
-        if (Test-AppInstalled "HWiNFO64")) {
-            Write-OK "HWiNFO64 installed."
-        } else {
-            Write-Err "HWiNFO64 installation did not complete."
-        }
+        winget install --id REALiX.HWiNFO --source winget --silent --accept-package-agreements --accept-source-agreements
+        Write-OK "HWiNFO64 installed."
     }
     catch {
         Write-Err "Failed to install HWiNFO64: $($_.Exception.Message)"
@@ -1069,10 +936,8 @@ if (-not (Test-AppInstalled "HWiNFO64")) {
 }
 else {
     Write-Info "HWiNFO64 already installed — checking for updates..."
-
     try {
         $upgrade = winget upgrade --id REALiX.HWiNFO --source winget --silent --accept-package-agreements --accept-source-agreements
-
         if ($upgrade -match "No available upgrade") {
             Write-OK "HWiNFO64 is already up to date."
         } else {
@@ -1084,94 +949,67 @@ else {
     }
 }
 
-# ============================================================================
-# ADB tools
-# ============================================================================
-Write-Info "Downloading and installing Android Platform Tools (ADB)..."
+# =====================================================================
+# ADB tools (C:\ADB)
+# =====================================================================
+Write-Info "Checking Android Platform Tools (ADB)..."
 
-# Define URL and paths
 $adbUrl   = "https://dl.google.com/android/repository/platform-tools-latest-windows.zip"
 $zipPath  = "$env:TEMP\platform-tools.zip"
 $tempPath = "$env:TEMP\platform-tools-temp"
 $destPath = "C:\ADB"
 
-# Check if ADB is already installed
 if (Test-Path "$destPath\adb.exe") {
-    Write-Host "ADB directory already exists at $destPath. Skipping download and installation."
-} else {
+    Write-Info "ADB already installed — skipping."
+}
+else {
     try {
-        # Download the ZIP
-        Invoke-WebRequest -Uri $adbUrl -OutFile $zipPath -UseBasicParsing
-        Write-Host "Downloaded ADB package to $zipPath"
-
-        # Ensure temp folder is clean
+        Invoke-WebRequest -Uri $adbUrl -OutFile $zipPath -UseBasicParsing -ErrorAction Stop
         if (Test-Path $tempPath) { Remove-Item $tempPath -Recurse -Force }
+        if (-not (Test-Path $destPath)) { New-Item -ItemType Directory -Path $destPath | Out-Null }
 
-        # Create destination folder
-        New-Item -ItemType Directory -Path $destPath | Out-Null
-
-        # Extract the ZIP into temp
         Expand-Archive -Path $zipPath -DestinationPath $tempPath -Force
-        Write-Host "Extracted ADB tools to $tempPath"
-
-        # Move contents of inner 'platform-tools' folder into C:\ADB
         Move-Item -Path "$tempPath\platform-tools\*" -Destination $destPath -Force
-        Write-Host "Moved ADB files to $destPath"
 
-        # Cleanup
         Remove-Item $zipPath -Force
         Remove-Item $tempPath -Recurse -Force
-        Write-Host "Cleaned up temporary files"
 
-        # (Optional) Add to PATH environment variable
-        $envPath = [System.Environment]::GetEnvironmentVariable("Path", "Machine")
-        if ($envPath -notlike "*$destPath*") {
-            [System.Environment]::SetEnvironmentVariable("Path", "$envPath;$destPath", "Machine")
-            Write-Host "Added $destPath to system PATH"
-        }
-
-        Write-OK "ADB tools installed successfully."
-    } catch {
-        Write-Error "ADB installation failed: $($_.Exception.Message)"
+        Write-OK "ADB installed into $destPath."
+    }
+    catch {
+        Write-Err "ADB installation failed: $($_.Exception.Message)"
     }
 }
 
-# ============================================================================
+# =====================================================================
 # Lenovo Legion Toolkit
-# ============================================================================
+# =====================================================================
 if (-not (Test-AppInstalled "Lenovo Legion Toolkit")) {
-    Write-Info "Downloading and installing Lenovo Legion Toolkit from GitHub..."
+    Write-Info "Installing Lenovo Legion Toolkit..."
 
-    # GitHub API for latest release
     $apiUrl = "https://api.github.com/repos/BartoszCichecki/LenovoLegionToolkit/releases/latest"
     $release = Invoke-RestMethod -Uri $apiUrl -UseBasicParsing
-
-    # Find the EXE asset
     $asset = $release.assets | Where-Object { $_.name -like "*.exe" } | Select-Object -First 1
-    $downloadUrl = $asset.browser_download_url
+
     $installerPath = "$env:TEMP\$($asset.name)"
 
     try {
-        # Download installer
-        Invoke-WebRequest -Uri $downloadUrl -OutFile $installerPath -UseBasicParsing
-        Write-Host "Downloaded installer to $installerPath"
-
-        # Run installer silently
+        Invoke-WebRequest -Uri $asset.browser_download_url -OutFile $installerPath -UseBasicParsing
         Start-Process -FilePath $installerPath -ArgumentList "/VERYSILENT /NORESTART"
-
-        Write-OK "Lenovo Legion Toolkit installation started (running silently in background)."
+        Write-OK "Lenovo Legion Toolkit installation started."
 
         Start-Sleep -Seconds 15
         Remove-Item $installerPath -Force
-        Write-Host "Deleted installer file"
-    } catch {
-        Write-Error "Installation failed: $($_.Exception.Message)"
     }
-} else {
+    catch {
+        Write-Err "Failed to install Lenovo Legion Toolkit: $($_.Exception.Message)"
+    }
+}
+else {
     Write-Info "Lenovo Legion Toolkit already installed — skipping."
 }
 
-# 16. DEFAULT WALLPAPER
+# 14. DEFAULT WALLPAPER
 # ============================================================================
 Write-Info "Setting custom wallpaper..."
 
@@ -1208,7 +1046,7 @@ public class Wallpaper {
 
 Write-OK "Custom wallpaper applied with full quality (PNG)."
 
-# 17. TASKBAR CACHE CLEANUP + EXPLORER RESTART
+# 15. TASKBAR CACHE CLEANUP + EXPLORER RESTART
 # ============================================================================
 Write-Host "Cleaning taskbar cache..."
 
@@ -1302,7 +1140,7 @@ foreach ($folder in $folders) {
     }
 }
 
-# 18. AUTOMATIC REBOOT WITH BANNER
+# 16. AUTOMATIC REBOOT WITH BANNER
 # ============================================================================
 
 $rebootDelay = 15
@@ -1320,25 +1158,3 @@ Write-Host ""
 
 Start-Sleep -Seconds $rebootDelay
 shutdown /r /t 0
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
