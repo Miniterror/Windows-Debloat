@@ -553,21 +553,35 @@ reg add "HKLM\SYSTEM\CurrentControlSet\Control" /v SvcHostSplitThresholdInKB /t 
 # 9. LOCALE, TIMEZONE, LANGUAGE
 # ============================================================================
 
-Write-Info "Setting locale/timezone to NL / W. Europe..."
+Write-Info "Setting timezone and Dutch regional formats..."
 
+# Timezone
 tzutil /s "W. Europe Standard Time"
-Set-WinSystemLocale nl-NL
-Set-WinUserLanguageList nl-NL -Force
+
+# Keep English system language
+Set-WinSystemLocale en-US
+
+# Keep only English as user language (no extra inputs)
+$LangList = New-WinUserLanguageList en-US
+$LangList[0].Handwriting = $false
+Set-WinUserLanguageList $LangList -Force
+
+# Set Dutch regional culture (date/time/number formatting)
 Set-Culture nl-NL
-Set-WinHomeLocation -GeoId 176  # Nederland
+Set-WinHomeLocation -GeoId 176  # Netherlands
+
+# Force Dutch date/time formats
+Set-ItemProperty -Path "HKCU:\Control Panel\International" -Name sShortDate -Value "dd-MM-yyyy"
+Set-ItemProperty -Path "HKCU:\Control Panel\International" -Name sLongDate -Value "dddd d MMMM yyyy"
+Set-ItemProperty -Path "HKCU:\Control Panel\International" -Name sTimeFormat -Value "HH:mm:ss"
+Set-ItemProperty -Path "HKCU:\Control Panel\International" -Name sShortTime -Value "HH:mm"
+Set-ItemProperty -Path "HKCU:\Control Panel\International" -Name iTime -Value 1
+Set-ItemProperty -Path "HKCU:\Control Panel\International" -Name iDate -Value 1
 
 Write-Info "Forcing time synchronization..."
 
-# Restart Windows Time service
 Stop-Service w32time
 Start-Service w32time
-
-# Trigger immediate sync
 w32tm /resync /force
 
 # 10. THEME / ACCENT COLOR
@@ -1291,6 +1305,7 @@ Write-Host ""
 
 Start-Sleep -Seconds $rebootDelay
 shutdown /r /t 0
+
 
 
 
