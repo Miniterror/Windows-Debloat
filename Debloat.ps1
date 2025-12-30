@@ -1095,7 +1095,7 @@ $tempPath = "$env:TEMP\platform-tools-temp"
 $destPath = "C:\ADB"
 
 # Check if ADB is already installed
-if (Test-Path $destPath) {
+if (Test-Path "$destPath\adb.exe") {
     Write-Host "ADB directory already exists at $destPath. Skipping download and installation."
 } else {
     try {
@@ -1352,6 +1352,7 @@ Write-Host ""
 
 Start-Sleep -Seconds $rebootDelay
 shutdown /r /t 0
+
 
 
 
