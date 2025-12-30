@@ -506,7 +506,7 @@ foreach ($task in $tasks) {
         Write-Information "Successfully disabled: $task"
     }
     catch {
-        Write-Information "Failed to disable $task: $($_.Exception.Message)"
+        Write-Information ("Failed to disable {0}: {1}" -f $task, $_.Exception.Message)
     }
 }
 
@@ -1421,4 +1421,5 @@ Write-Host ""
 
 Start-Sleep -Seconds $rebootDelay
 shutdown /r /t 0
+
 
