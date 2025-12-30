@@ -653,66 +653,81 @@ if (Test-Path $defaultNtUser) {
 # 12. EDGE POLICIES + EU-CONDITIONAL EDGE REMOVAL
 # ============================================================================
 
-Write-Info "Applying Edge policies..."
-
-# Disable Edge first-run and background features
-reg add "HKLM\Software\Policies\Microsoft\Edge" /v HideFirstRunExperience /t REG_DWORD /d 1 /f > $null
-reg add "HKLM\Software\Policies\Microsoft\Edge\Recommended" /v BackgroundModeEnabled /t REG_DWORD /d 0 /f > $null
-reg add "HKLM\Software\Policies\Microsoft\Edge\Recommended" /v StartupBoostEnabled /t REG_DWORD /d 0 /f > $null
-
-# Block EdgeUpdate from reinstalling Edge
-reg add "HKLM\SOFTWARE\Policies\Microsoft\EdgeUpdate" /v UpdateDefault /t REG_DWORD /d 0 /f > $null
-reg add "HKLM\SOFTWARE\Microsoft\EdgeUpdate" /v UpdateDefault /t REG_DWORD /d 0 /f > $null
+Write-Info "Starting Edge neutralization for EU build..."
 
 if ($IsEU) {
-    Write-Info "EU build detected — removing Microsoft Edge browser..."
+    reg add "HKLM\Software\Policies\Microsoft\Edge" /v HideFirstRunExperience /t REG_DWORD /d 1 /f > $null
+    reg add "HKLM\Software\Policies\Microsoft\Edge" /v DefaultBrowserSettingEnabled /t REG_DWORD /d 0 /f > $null
+    reg add "HKLM\Software\Policies\Microsoft\Edge\Recommended" /v BackgroundModeEnabled /t REG_DWORD /d 0 /f > $null
+    reg add "HKLM\Software\Policies\Microsoft\Edge\Recommended" /v StartupBoostEnabled /t REG_DWORD /d 0 /f > $null
+    reg add "HKLM\SOFTWARE\Policies\Microsoft\EdgeUpdate" /v UpdateDefault /t REG_DWORD /d 0 /f > $null
+    reg add "HKLM\SOFTWARE\Microsoft\EdgeUpdate" /v UpdateDefault /t REG_DWORD /d 0 /f > $null
 
-    # Stop and disable EdgeUpdate services
     foreach ($svc in @("edgeupdate", "edgeupdatem")) {
-        if (Get-Service $svc -ErrorAction SilentlyContinue) {
-            Write-Info "Disabling service: $svc"
+        $service = Get-Service $svc -ErrorAction SilentlyContinue
+        if ($service) {
             Stop-Service $svc -Force -ErrorAction SilentlyContinue
             Set-Service $svc -StartupType Disabled
         }
     }
 
-    # Remove scheduled tasks that reinstall Edge
-    $tasks = @(
-        "\Microsoft\EdgeUpdate\MicrosoftEdgeUpdateTaskMachineCore",
-        "\Microsoft\EdgeUpdate\MicrosoftEdgeUpdateTaskMachineUA"
+    schtasks /Delete /TN "\Microsoft\EdgeUpdate\MicrosoftEdgeUpdateTaskMachineCore" /F > $null 2>&1
+    schtasks /Delete /TN "\Microsoft\EdgeUpdate\MicrosoftEdgeUpdateTaskMachineUA" /F > $null 2>&1
+
+    $edgeShortcuts = @(
+        "$env:PUBLIC\Desktop\Microsoft Edge.lnk",
+        "$env:APPDATA\Microsoft\Internet Explorer\Quick Launch\User Pinned\TaskBar\Microsoft Edge.lnk",
+        "$env:PROGRAMDATA\Microsoft\Windows\Start Menu\Programs\Microsoft Edge.lnk"
     )
-    foreach ($task in $tasks) {
-        schtasks /Delete /TN $task /F > $null 2>&1
+
+    foreach ($shortcut in $edgeShortcuts) {
+        if (Test-Path $shortcut) {
+            Remove-Item $shortcut -Force -ErrorAction SilentlyContinue
+        }
     }
 
-    # Locate the correct Edge installer
-    $installer = Get-ChildItem "C:\Program Files (x86)\Microsoft\Edge\Application" -Recurse -Filter "setup.exe" -ErrorAction SilentlyContinue |
-                 Where-Object { $_.FullName -like "*\Installer\setup.exe" } |
-                 Select-Object -First 1
-
-    if ($installer) {
-        Write-Info "Executing Edge uninstall from: $($installer.FullName)"
-        & $installer.FullName --uninstall --system-level --force-uninstall --verbose-logging
-        Write-OK "Edge uninstall command executed."
-    } else {
-        Write-Warn "Edge installer not found — skipping uninstall."
+    # Remove taskbar pin via registry
+    $taskbarReg = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Taskband"
+    if (Test-Path $taskbarReg) {
+        Remove-ItemProperty -Path $taskbarReg -Name "Favorites" -ErrorAction SilentlyContinue
+        Remove-ItemProperty -Path $taskbarReg -Name "FavoritesResolve" -ErrorAction SilentlyContinue
     }
 
-    # Remove EU stub launcher (only present on EU builds)
-    $stubPath = "C:\Windows\SystemApps\Microsoft.MicrosoftEdge.Stub_8wekyb3d8bbwe"
-    if (Test-Path $stubPath) {
-        Write-Info "Removing Edge stub launcher..."
-        takeown /f $stubPath /r /d y > $null
-        icacls $stubPath /grant administrators:F /t > $null
-        Remove-Item $stubPath -Recurse -Force
-        Write-OK "Edge stub removed."
+    $srpPath = "HKLM:\SOFTWARE\Policies\Microsoft\Windows\Safer\CodeIdentifiers"
+    reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows\Safer\CodeIdentifiers" /v DefaultLevel /t REG_DWORD /d 0x40000 /f > $null
+
+    $pathsToBlock = @(
+        "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
+        "C:\Program Files\Microsoft\Edge\Application\msedge.exe"
+    )
+
+    $ruleId = 10000
+    foreach ($path in $pathsToBlock) {
+        if (Test-Path $path) {
+            $ruleKey = "$srpPath\0\Paths\$ruleId"
+            New-Item -Path $ruleKey -Force | Out-Null
+            New-ItemProperty -Path $ruleKey -Name "ItemData" -Value $path -PropertyType String -Force | Out-Null
+            New-ItemProperty -Path $ruleKey -Name "SaferFlags" -Value 0 -PropertyType DWord -Force | Out-Null
+            $ruleId++
+        }
     }
 
-    Write-OK "Microsoft Edge removal completed for EU build."
+    # This assumes Chrome; replace with your browser if needed.
+    $assoc = @(
+        "http", "https", "html", "htm", "pdf"
+    )
+
+    foreach ($ext in $assoc) {
+        reg add "HKCU\Software\Microsoft\Windows\Shell\Associations\UrlAssociations\$ext\UserChoice" `
+            /v ProgId /t REG_SZ /d "ChromeHTML" /f > $null
+    }
+
+    Write-OK "Edge neutralization completed. Edge is now hidden, blocked, and non-functional."
 
 } else {
-    Write-Info "Skipping Edge removal — not an EU-regulated build."
+    Write-Info "Non-EU build detected — skipping Edge neutralization."
 }
+
 
 # 13. EXPLORER / SEARCH / CLASSIC CONTEXT MENU / WEB INTEGRATION
 # ============================================================================
@@ -1248,6 +1263,7 @@ Write-Host ""
 
 Start-Sleep -Seconds $rebootDelay
 shutdown /r /t 0
+
 
 
 
