@@ -988,12 +988,29 @@ if (-not (Test-AppInstalled "Discord")) {
         Write-Err "Failed to install Discord: $($_.Exception.Message)"
     }
 
-    try {
-    Remove-Item $discordInstaller -Force
-} catch {
-    Start-Sleep -Seconds 3
-    Remove-Item $discordInstaller -Force -ErrorAction SilentlyContinue
-}
+    # --- Safe cleanup of installer ---
+    if (Test-Path $discordInstaller) {
+        try {
+            # Try normal delete first
+            Remove-Item $discordInstaller -Force -ErrorAction Stop
+        }
+        catch {
+            # If locked, wait and try again silently
+            Start-Sleep -Seconds 3
+
+            try {
+                # Kill any running installer process
+                Get-Process "discord_installer" -ErrorAction SilentlyContinue |
+                    Stop-Process -Force -ErrorAction SilentlyContinue
+
+                Remove-Item $discordInstaller -Force -ErrorAction SilentlyContinue
+            }
+            catch {
+                # Final fallback: log and skip
+                Write-Info "Discord installer could not be removed (file in use). Skipping cleanup."
+            }
+        }
+    }
 } else {
     Write-Info "Discord already installed — skipping."
 }
@@ -1326,6 +1343,7 @@ Write-Host ""
 
 Start-Sleep -Seconds $rebootDelay
 shutdown /r /t 0
+
 
 
 
