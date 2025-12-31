@@ -831,7 +831,7 @@ function Install-FromUrl {
         Write-OK "$Name installed."
     }
     catch {
-        Write-Err "Failed to install $Name: $($_.Exception.Message)"
+        Write-Err "Failed to install ${Name}: $($_.Exception.Message)"
     }
 
     if (Test-Path $installer) { Remove-Item $installer -Force -ErrorAction SilentlyContinue }
@@ -1158,3 +1158,4 @@ Write-Host ""
 
 Start-Sleep -Seconds $rebootDelay
 shutdown /r /t 0
+
