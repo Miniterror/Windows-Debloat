@@ -330,34 +330,8 @@ reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" /v St
 reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" /v Start_TrackProgs /t REG_DWORD /d 0 /f > $null
 reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" /v ShowSyncProviderNotifications /t REG_DWORD /d 0 /f > $null
 
-# TASKBAR ALIGNMENT
-Write-Host ""
-Write-Host "=== Taskbar Alignment ===" -ForegroundColor Yellow
-Write-Host "Choose taskbar alignment:"
-Write-Host "1 = Left"
-Write-Host "2 = Center"
-$taskbarChoice = Read-Host "Enter your choice (1-2)"
-
-switch ($taskbarChoice) {
-
-    "1" {
-        Write-Info "Setting taskbar alignment to LEFT..."
-        reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" `
-            /v TaskbarAl /t REG_DWORD /d 0 /f > $null
-    }
-
-    "2" {
-        Write-Info "Setting taskbar alignment to CENTER..."
-        reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" `
-            /v TaskbarAl /t REG_DWORD /d 1 /f > $null
-    }
-
-    default {
-        Write-Warn "Invalid choice — taskbar alignment unchanged."
-    }
-}
-
-Write-Host "You may need to restart Explorer for the change to take effect."
+# Taskbar alignment left
+reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" /v TaskbarAl /t REG_DWORD /d 0 /f > $null
 
 # Clear Taskbar pins folder
 $taskbarPins = "$env:APPDATA\Microsoft\Internet Explorer\Quick Launch\User Pinned\TaskBar"
@@ -644,90 +618,80 @@ try {
 
 # 11. EDGE POLICIES + EU-CONDITIONAL EDGE REMOVAL
 # ============================================================================
-Write-Info "Edge neutralization section loaded."
 
-# Ask end user whether to apply Edge neutralization
-$applyEdgeNeutralization = Read-Host "Do you want to disable and neutralize Microsoft Edge? (Y/N)"
+Write-Info "Starting Edge neutralization for EU build..."
 
-if ($applyEdgeNeutralization -match '^[Yy]$') {
+if ($IsEU) {
+    reg add "HKLM\Software\Policies\Microsoft\Edge" /v HideFirstRunExperience /t REG_DWORD /d 1 /f > $null
+    reg add "HKLM\Software\Policies\Microsoft\Edge" /v DefaultBrowserSettingEnabled /t REG_DWORD /d 0 /f > $null
+    reg add "HKLM\Software\Policies\Microsoft\Edge\Recommended" /v BackgroundModeEnabled /t REG_DWORD /d 0 /f > $null
+    reg add "HKLM\Software\Policies\Microsoft\Edge\Recommended" /v StartupBoostEnabled /t REG_DWORD /d 0 /f > $null
+    reg add "HKLM\SOFTWARE\Policies\Microsoft\EdgeUpdate" /v UpdateDefault /t REG_DWORD /d 0 /f > $null
+    reg add "HKLM\SOFTWARE\Microsoft\EdgeUpdate" /v UpdateDefault /t REG_DWORD /d 0 /f > $null
 
-    Write-Info "Starting Edge neutralization for EU build..."
-
-    if ($IsEU) {
-        reg add "HKLM\Software\Policies\Microsoft\Edge" /v HideFirstRunExperience /t REG_DWORD /d 1 /f > $null
-        reg add "HKLM\Software\Policies\Microsoft\Edge" /v DefaultBrowserSettingEnabled /t REG_DWORD /d 0 /f > $null
-        reg add "HKLM\Software\Policies\Microsoft\Edge\Recommended" /v BackgroundModeEnabled /t REG_DWORD /d 0 /f > $null
-        reg add "HKLM\Software\Policies\Microsoft\Edge\Recommended" /v StartupBoostEnabled /t REG_DWORD /d 0 /f > $null
-        reg add "HKLM\SOFTWARE\Policies\Microsoft\EdgeUpdate" /v UpdateDefault /t REG_DWORD /d 0 /f > $null
-        reg add "HKLM\SOFTWARE\Microsoft\EdgeUpdate" /v UpdateDefault /t REG_DWORD /d 0 /f > $null
-
-        foreach ($svc in @("edgeupdate", "edgeupdatem")) {
-            $service = Get-Service $svc -ErrorAction SilentlyContinue
-            if ($service) {
-                Stop-Service $svc -Force -ErrorAction SilentlyContinue
-                Set-Service $svc -StartupType Disabled
-            }
+    foreach ($svc in @("edgeupdate", "edgeupdatem")) {
+        $service = Get-Service $svc -ErrorAction SilentlyContinue
+        if ($service) {
+            Stop-Service $svc -Force -ErrorAction SilentlyContinue
+            Set-Service $svc -StartupType Disabled
         }
-
-        schtasks /Delete /TN "\Microsoft\EdgeUpdate\MicrosoftEdgeUpdateTaskMachineCore" /F > $null 2>&1
-        schtasks /Delete /TN "\Microsoft\EdgeUpdate\MicrosoftEdgeUpdateTaskMachineUA" /F > $null 2>&1
-
-        $edgeShortcuts = @(
-            "$env:PUBLIC\Desktop\Microsoft Edge.lnk",
-            "$env:APPDATA\Microsoft\Internet Explorer\Quick Launch\User Pinned\TaskBar\Microsoft Edge.lnk",
-            "$env:PROGRAMDATA\Microsoft\Windows\Start Menu\Programs\Microsoft Edge.lnk"
-        )
-
-        foreach ($shortcut in $edgeShortcuts) {
-            if (Test-Path $shortcut) {
-                Remove-Item $shortcut -Force -ErrorAction SilentlyContinue
-            }
-        }
-
-        # Remove taskbar pin via registry
-        $taskbarReg = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Taskband"
-        if (Test-Path $taskbarReg) {
-            Remove-ItemProperty -Path $taskbarReg -Name "Favorites" -ErrorAction SilentlyContinue
-            Remove-ItemProperty -Path $taskbarReg -Name "FavoritesResolve" -ErrorAction SilentlyContinue
-        }
-
-        $srpPath = "HKLM:\SOFTWARE\Policies\Microsoft\Windows\Safer\CodeIdentifiers"
-        reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows\Safer\CodeIdentifiers" /v DefaultLevel /t REG_DWORD /d 0x40000 /f > $null
-
-        $pathsToBlock = @(
-            "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
-            "C:\Program Files\Microsoft\Edge\Application\msedge.exe"
-        )
-
-        $ruleId = 10000
-        foreach ($path in $pathsToBlock) {
-            if (Test-Path $path) {
-                $ruleKey = "$srpPath\0\Paths\$ruleId"
-                New-Item -Path $ruleKey -Force | Out-Null
-                New-ItemProperty -Path $ruleKey -Name "ItemData" -Value $path -PropertyType String -Force | Out-Null
-                New-ItemProperty -Path $ruleKey -Name "SaferFlags" -Value 0 -PropertyType DWord -Force | Out-Null
-                $ruleId++
-            }
-        }
-
-        # This assumes Chrome; replace with your browser if needed.
-        $assoc = @(
-            "http", "https", "html", "htm", "pdf"
-        )
-
-        foreach ($ext in $assoc) {
-            reg add "HKCU\Software\Microsoft\Windows\Shell\Associations\UrlAssociations\$ext\UserChoice" `
-                /v ProgId /t REG_SZ /d "ChromeHTML" /f > $null
-        }
-
-        Write-OK "Edge neutralization completed. Edge is now hidden, blocked, and non-functional."
-
-    } else {
-        Write-Info "Non-EU build detected — skipping Edge neutralization."
     }
 
+    schtasks /Delete /TN "\Microsoft\EdgeUpdate\MicrosoftEdgeUpdateTaskMachineCore" /F > $null 2>&1
+    schtasks /Delete /TN "\Microsoft\EdgeUpdate\MicrosoftEdgeUpdateTaskMachineUA" /F > $null 2>&1
+
+    $edgeShortcuts = @(
+        "$env:PUBLIC\Desktop\Microsoft Edge.lnk",
+        "$env:APPDATA\Microsoft\Internet Explorer\Quick Launch\User Pinned\TaskBar\Microsoft Edge.lnk",
+        "$env:PROGRAMDATA\Microsoft\Windows\Start Menu\Programs\Microsoft Edge.lnk"
+    )
+
+    foreach ($shortcut in $edgeShortcuts) {
+        if (Test-Path $shortcut) {
+            Remove-Item $shortcut -Force -ErrorAction SilentlyContinue
+        }
+    }
+
+    # Remove taskbar pin via registry
+    $taskbarReg = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Taskband"
+    if (Test-Path $taskbarReg) {
+        Remove-ItemProperty -Path $taskbarReg -Name "Favorites" -ErrorAction SilentlyContinue
+        Remove-ItemProperty -Path $taskbarReg -Name "FavoritesResolve" -ErrorAction SilentlyContinue
+    }
+
+    $srpPath = "HKLM:\SOFTWARE\Policies\Microsoft\Windows\Safer\CodeIdentifiers"
+    reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows\Safer\CodeIdentifiers" /v DefaultLevel /t REG_DWORD /d 0x40000 /f > $null
+
+    $pathsToBlock = @(
+        "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
+        "C:\Program Files\Microsoft\Edge\Application\msedge.exe"
+    )
+
+    $ruleId = 10000
+    foreach ($path in $pathsToBlock) {
+        if (Test-Path $path) {
+            $ruleKey = "$srpPath\0\Paths\$ruleId"
+            New-Item -Path $ruleKey -Force | Out-Null
+            New-ItemProperty -Path $ruleKey -Name "ItemData" -Value $path -PropertyType String -Force | Out-Null
+            New-ItemProperty -Path $ruleKey -Name "SaferFlags" -Value 0 -PropertyType DWord -Force | Out-Null
+            $ruleId++
+        }
+    }
+
+    # This assumes Chrome; replace with your browser if needed.
+    $assoc = @(
+        "http", "https", "html", "htm", "pdf"
+    )
+
+    foreach ($ext in $assoc) {
+        reg add "HKCU\Software\Microsoft\Windows\Shell\Associations\UrlAssociations\$ext\UserChoice" `
+            /v ProgId /t REG_SZ /d "ChromeHTML" /f > $null
+    }
+
+    Write-OK "Edge neutralization completed. Edge is now hidden, blocked, and non-functional."
+
 } else {
-    Write-Info "User chose not to neutralize Edge — skipping."
+    Write-Info "Non-EU build detected — skipping Edge neutralization."
 }
 
 # 12. ONEDRIVE FULL REMOVAL
@@ -1158,4 +1122,5 @@ Write-Host ""
 
 Start-Sleep -Seconds $rebootDelay
 shutdown /r /t 0
+
 
