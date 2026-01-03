@@ -637,7 +637,6 @@ Write-Output "Xbox Game Bar has been disabled."
 
 # 8. VBS / CORE ISOLATION / SVCHOST SPLIT
 # ============================================================================
-
 Write-Info "Disabling VBS / Core Isolation..."
 
 # Virtualization-Based Security
@@ -648,8 +647,22 @@ reg add "HKLM\System\CurrentControlSet\Control\DeviceGuard\Scenarios\HypervisorE
 reg add "HKLM\System\CurrentControlSet\Control\DeviceGuard\Scenarios\HypervisorEnforcedCodeIntegrity" /v EnabledBootId /t REG_DWORD /d 0 /f > $null
 reg add "HKLM\System\CurrentControlSet\Control\DeviceGuard\Scenarios\HypervisorEnforcedCodeIntegrity" /v WasEnabledBy /t REG_DWORD /d 0 /f > $null
 
-Write-Info "Applying SvcHostSplitThresholdInKB..."
-reg add "HKLM\SYSTEM\CurrentControlSet\Control" /v SvcHostSplitThresholdInKB /t REG_DWORD /d 67108864 /f > $null
+# Ask user about SvcHostSplitThresholdInKB
+Write-Host ""
+Write-Host "SvcHostSplitThresholdInKB controls how Windows splits svchost.exe processes." -ForegroundColor Yellow
+Write-Host "Raising this value can improve stability for some workloads, BUT:" -ForegroundColor Yellow
+Write-Host "⚠️ If a service runs out of memory, the system may BSOD instead of isolating the failure." -ForegroundColor Red
+Write-Host ""
+
+$svcChoice = Read-Host "Do you want to apply the SvcHostSplitThresholdInKB tweak? (Y/N)"
+
+if ($svcChoice -match '^[Yy]$') {
+    Write-Info "Applying SvcHostSplitThresholdInKB..."
+    reg add "HKLM\SYSTEM\CurrentControlSet\Control" /v SvcHostSplitThresholdInKB /t REG_DWORD /d 67108864 /f > $null
+    Write-Info "SvcHostSplitThresholdInKB applied."
+} else {
+    Write-Info "Skipping SvcHostSplitThresholdInKB tweak."
+}
 
 # 9. THEME / ACCENT COLOR (Interactive)
 # ============================================================================
@@ -1421,5 +1434,6 @@ Write-Host ""
 
 Start-Sleep -Seconds $rebootDelay
 shutdown /r /t 0
+
 
 
