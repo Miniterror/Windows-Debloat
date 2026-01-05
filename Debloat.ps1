@@ -206,7 +206,7 @@ reg add "HKLM\Software\Policies\Microsoft\Windows\System" /v UploadUserActivitie
 $AppPrivacy = "HKLM\Software\Policies\Microsoft\Windows\AppPrivacy"
 
 $permissions = @(
-    "LetAppsAccessCamera","LetAppsAccessMicrophone","LetAppsAccessContacts","LetAppsAccessCalendar",
+    "LetAppsAccessCamera","LetAppsAccessContacts","LetAppsAccessCalendar",
     "LetAppsAccessEmail","LetAppsAccessTasks","LetAppsAccessPhoneCallHistory","LetAppsAccessRadios",
     "LetAppsAccessMotion","LetAppsAccessFileSystem","LetAppsAccessPicturesLibrary","LetAppsAccessVideosLibrary",
     "LetAppsAccessDocumentsLibrary","LetAppsAccessUnpairedDevices","LetAppsAccessBluetooth",
@@ -1146,6 +1146,7 @@ Write-Host ""
 
 Start-Sleep -Seconds $rebootDelay
 shutdown /r /t 0
+
 
 
 
